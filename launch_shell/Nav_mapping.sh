@@ -18,8 +18,8 @@ export LD_PRELOAD="/usr/lib/x86_64-linux-gnu/libusb-1.0.so"
 source ~/code/ros_ws/install/setup.bash
 
 # 启动导航all
-ros2 launch pb2025_sentry_bringup bringup.launch.py \
-world:=VGD \
+ros2 launch pb2025_sentry_bringup test.launch.py \
+# world:=VGD \
 use_rviz:=True \
 use_robot_state_pub:=True \
 slam:=True \
