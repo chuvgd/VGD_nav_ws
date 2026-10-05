@@ -8,16 +8,19 @@
         <RateController hz="3.0">
           <RecoveryNode name="ComputePathToPose"
                         number_of_retries="1">
-            <ComputePathToPose goal="{goal}"
-                               path="{path}"
-                               planner_id="GridBased"/>
+            <Sequence name="ComputePathToPose">
+                <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
+                <!-- <SmoothPath unsmoothed_path="{path}" smoothed_path="{path}"/> -->
+                <SmoothPath unsmoothed_path="{path}" smoothed_path="{smoothed_path}"/>
+                <!-- <SmoothPath unsmoothed_path="{path}"/> -->
+            </Sequence>
             <ClearEntireCostmap name="ClearGlobalCostmap-Context"
                                 service_name="global_costmap/clear_entirely_global_costmap"/>
           </RecoveryNode>
         </RateController>
         <RecoveryNode name="FollowPath"
                       number_of_retries="10">
-          <FollowPath path="{path}"
+          <FollowPath path="{smoothed_path}"
                       controller_id="FollowPath"/>
           <ClearEntireCostmap name="ClearLocalCostmap-Context"
                               service_name="local_costmap/clear_entirely_local_costmap"/>

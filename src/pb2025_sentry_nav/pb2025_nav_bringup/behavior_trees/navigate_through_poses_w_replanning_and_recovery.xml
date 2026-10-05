@@ -10,12 +10,13 @@
                         number_of_retries="1">
             <ReactiveSequence>
               <RemovePassedGoals input_goals="{goals}"
-                   output_goals="{goals}"
-                   radius="0.7"
-                   robot_base_frame="gimbal_yaw_fake"/>
-              <ComputePathThroughPoses goals="{goals}"
-                                       path="{path}"
-                                       planner_id="GridBased"/>
+                                 output_goals="{goals}"
+                                 radius="0.7"
+                                 robot_base_frame="gimbal_yaw_fake"/>
+              <Sequence>
+                <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
+                <SmoothPath unsmoothed_path="{path}" smoothed_path="{smoothed_path}"/>
+              </Sequence>
             </ReactiveSequence>
             <ClearEntireCostmap name="ClearGlobalCostmap-Context"
                                 service_name="global_costmap/clear_entirely_global_costmap"/>
@@ -23,7 +24,7 @@
         </RateController>
         <RecoveryNode name="FollowPath"
                       number_of_retries="10">
-          <FollowPath path="{path}"
+          <FollowPath path="{smoothed_path}"
                       controller_id="FollowPath"/>
           <ClearEntireCostmap name="ClearLocalCostmap-Context"
                               service_name="local_costmap/clear_entirely_local_costmap"/>
