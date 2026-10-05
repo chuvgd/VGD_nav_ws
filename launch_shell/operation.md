@@ -51,3 +51,6 @@ ros2 run nav2_map_server map_saver_cli -f VGD
 
 #打印速度日志
 ros2 topic echo /cmd_vel > test2.txt
+
+#编译
+#colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release --parallel-workers 10
