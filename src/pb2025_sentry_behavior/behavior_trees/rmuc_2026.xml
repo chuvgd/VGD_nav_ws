@@ -1,0 +1,685 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="check_game_start">
+    <Fallback>
+      <IsGameStatus max_remain_time="420"
+                    min_remain_time="0"
+                    expected_game_progress="4"
+                    key_port="{@referee_gameStatus}"/>
+      <ForceFailure>
+        <Sequence>
+          <PublishTwist v_y="0.0"
+                        v_yaw="0.0"
+                        v_x="0.0"
+                        duration="0.0"
+                        topic_name="cmd_vel"/>
+        </Sequence>
+      </ForceFailure>
+    </Fallback>
+  </BehaviorTree>
+
+  <BehaviorTree ID="check_robot_status">
+    <ReactiveFallback>
+      <Sequence>
+        <IsStatusOK ammo_min="50"
+                    heat_max="260"
+                    hp_min="200"
+                    key_port="{@referee_robotStatus}"/>
+        <Inverter>
+          <IsRfidDetected friendly_supply_zone_exchange="false"
+                          friendly_supply_zone_non_exchange="true"
+                          center_gain_point="false"
+                          friendly_fortress_gain_point="false"
+                          key_port="{@referee_rfidStatus}"/>
+        </Inverter>
+      </Sequence>
+      <Sequence>
+        <IsRfidDetected friendly_supply_zone_exchange="false"
+                        friendly_supply_zone_non_exchange="true"
+                        center_gain_point="false"
+                        friendly_fortress_gain_point="false"
+                        key_port="{@referee_rfidStatus}"/>
+        <PublishTwist v_y="0.0"
+                      v_yaw="0.0"
+                      v_x="0.0"
+                      duration="0.0"
+                      topic_name="cmd_vel"/>
+        <RetryUntilSuccess>
+          <IsStatusOK ammo_min="100"
+                      heat_max="260"
+                      hp_min="400"
+                      key_port="{@referee_robotStatus}"/>
+        </RetryUntilSuccess>
+      </Sequence>
+      <Sequence>
+        <Inverter>
+          <IsStatusOK ammo_min="50"
+                      heat_max="260"
+                      hp_min="200"
+                      key_port="{@referee_robotStatus}"/>
+        </Inverter>
+        <Inverter>
+          <IsRfidDetected friendly_supply_zone_exchange="false"
+                          friendly_supply_zone_non_exchange="true"
+                          center_gain_point="false"
+                          friendly_fortress_gain_point="false"
+                          key_port="{@referee_rfidStatus}"/>
+        </Inverter>
+        <ForceSuccess>
+          <SwitchSentryPosture target_posture="3"
+                               topic_name="/cmd/sentry_posture"/>
+        </ForceSuccess>
+        <SubTree ID="go_home"
+                 _autoremap="false"/>
+      </Sequence>
+    </ReactiveFallback>
+  </BehaviorTree>
+
+  <BehaviorTree ID="go_home">
+    <Sequence>
+      <LoadWaypoints total_waypoints="{home_total_wp}"
+                     wait_times="{home_wait_times}"
+                     waypoints="{home_waypoints}"
+                     frame_id="map"
+                     waypoint_file="/home/vgd/code/ros_ws/csv/go_home.csv"/>
+      <Script code="home_wp_idx:=0; reached_last_home:=0"/>
+      <KeepRunningUntilFailure>
+        <ForceSuccess>
+          <Sequence>
+            <GetCurrentWaypoint current_goal="{home_current_goal}"
+                                current_wait_sec="{home_wait_sec}"
+                                wp_idx="{home_wp_idx}"
+                                wait_times="{home_wait_times}"
+                                waypoints="{home_waypoints}"/>
+            <ReactiveFallback>
+              <Sequence>
+                <IsFlagSet flag_name="reached_last_home"/>
+                <Fallback>
+                  <Sequence>
+                    <IsPowerPostureAvailable hp_threshold="100"
+                                             key_port="{@referee_robotStatus}"
+                                             type="6"/>
+                    <ForceSuccess>
+                      <SwitchSentryPosture target_posture="6"
+                                           topic_name="/cmd/sentry_posture"/>
+                    </ForceSuccess>
+                  </Sequence>
+                  <ForceSuccess>
+                    <SwitchSentryPosture target_posture="3"
+                                         topic_name="/cmd/sentry_posture"/>
+                  </ForceSuccess>
+                </Fallback>
+                <SwitchFlag wp_idx="{home_wp_idx}"
+                            total_waypoints="{home_total_wp}"
+                            key_port="{@referee_allRobotHP}"
+                            topic_name="/cmd/switch_flag"/>
+                <PublishTwist v_y="0.0"
+                              v_yaw="0.0"
+                              v_x="0.0"
+                              duration="0.0"
+                              topic_name="cmd_vel"/>
+              </Sequence>
+              <ReactiveSequence>
+                <PubNav2GoalBB goal_pose="{home_current_goal}"
+                               frame_id="map"
+                               topic_name="goal_pose"/>
+                <Fallback>
+                  <Sequence>
+                    <IsPowerPostureAvailable hp_threshold="100"
+                                             key_port="{@referee_robotStatus}"
+                                             type="6"/>
+                    <ForceSuccess>
+                      <SwitchSentryPosture target_posture="6"
+                                           topic_name="/cmd/sentry_posture"/>
+                    </ForceSuccess>
+                  </Sequence>
+                  <ForceSuccess>
+                    <SwitchSentryPosture target_posture="3"
+                                         topic_name="/cmd/sentry_posture"/>
+                  </ForceSuccess>
+                </Fallback>
+                <SwitchFlag wp_idx="{home_wp_idx}"
+                            total_waypoints="{home_total_wp}"
+                            key_port="{@referee_allRobotHP}"
+                            topic_name="/cmd/switch_flag"/>
+                <WaitUntilReached robot_base_frame="gimbal_yaw_fake"
+                                  tolerance="0.500000"
+                                  goal_pose="{home_current_goal}"/>
+              </ReactiveSequence>
+            </ReactiveFallback>
+            <WaitDuration key_port="{@vision_string_data}"
+                          duration_sec="0.0"/>
+            <ForceSuccess>
+              <Sequence>
+                <IsLastWaypoint wp_idx="{home_wp_idx}"
+                                total_waypoints="{home_total_wp}"/>
+                <Script code="reached_last_home:=1"/>
+              </Sequence>
+            </ForceSuccess>
+            <NextWaypoint total_waypoints="{home_total_wp}"
+                          wp_idx="{home_wp_idx}"/>
+          </Sequence>
+        </ForceSuccess>
+      </KeepRunningUntilFailure>
+    </Sequence>
+  </BehaviorTree>
+
+  <BehaviorTree ID="patrol_nav">
+    <Sequence>
+      <LoadWaypoints total_waypoints="{patrol_total_wp}"
+                     wait_times="{patrol_wait_times}"
+                     waypoints="{patrol_waypoints}"
+                     frame_id="map"
+                     waypoint_file="/home/vgd/code/ros_ws/csv/patrol_nav.csv"/>
+      <Script code="patrol_wp_idx:=0"/>
+      <KeepRunningUntilFailure>
+        <Sequence>
+          <GetCurrentWaypoint current_goal="{patrol_current_goal}"
+                              current_wait_sec="{patrol_wait_sec}"
+                              wp_idx="{patrol_wp_idx}"
+                              wait_times="{patrol_wait_times}"
+                              waypoints="{patrol_waypoints}"/>
+          <ReactiveSequence>
+            <PubNav2GoalBB goal_pose="{patrol_current_goal}"
+                           frame_id="map"
+                           topic_name="goal_pose"/>
+            <Fallback>
+              <Sequence>
+                <IsDetectEnemy key_port="{@vision_string_data}"/>
+                <Fallback>
+                  <Sequence>
+                    <IsEnemyInRange max_distance="5.000000"
+                                    key_port="{@vision_string_data}"/>
+                    <IsPowerPostureAvailable hp_threshold="250"
+                                             key_port="{@referee_robotStatus}"
+                                             type="4"/>
+                    <ForceSuccess>
+                      <SwitchSentryPosture target_posture="4"
+                                           topic_name="/cmd/sentry_posture"/>
+                    </ForceSuccess>
+                  </Sequence>
+                  <ForceSuccess>
+                    <SwitchSentryPosture target_posture="1"
+                                         topic_name="/cmd/sentry_posture"/>
+                  </ForceSuccess>
+                </Fallback>
+              </Sequence>
+              <Sequence>
+                <IsAttacked vision_data="{@vision_string_data}"
+                            key_port="{@referee_robotStatus}"/>
+                <Fallback>
+                  <Sequence>
+                    <IsPowerPostureAvailable hp_threshold="250"
+                                             key_port="{@referee_robotStatus}"
+                                             type="5"/>
+                    <ForceSuccess>
+                      <SwitchSentryPosture target_posture="5"
+                                           topic_name="/cmd/sentry_posture"/>
+                    </ForceSuccess>
+                  </Sequence>
+                  <ForceSuccess>
+                    <SwitchSentryPosture target_posture="2"
+                                         topic_name="/cmd/sentry_posture"/>
+                  </ForceSuccess>
+                </Fallback>
+              </Sequence>
+              <ForceSuccess>
+                <SwitchSentryPosture target_posture="3"
+                                     topic_name="/cmd/sentry_posture"/>
+              </ForceSuccess>
+            </Fallback>
+            <SwitchFlag wp_idx="{patrol_wp_idx}"
+                        total_waypoints="{patrol_total_wp}"
+                        key_port="{@referee_allRobotHP}"
+                        topic_name="/cmd/switch_flag"/>
+            <WaitUntilReached robot_base_frame="gimbal_yaw_fake"
+                              tolerance="0.500000"
+                              goal_pose="{patrol_current_goal}"/>
+          </ReactiveSequence>
+          <ReactiveSequence>
+            <Fallback>
+              <Sequence>
+                <IsDetectEnemy key_port="{@vision_string_data}"/>
+                <Fallback>
+                  <Sequence>
+                    <IsEnemyInRange max_distance="5.000000"
+                                    key_port="{@vision_string_data}"/>
+                    <IsPowerPostureAvailable hp_threshold="250"
+                                             key_port="{@referee_robotStatus}"
+                                             type="4"/>
+                    <ForceSuccess>
+                      <SwitchSentryPosture target_posture="4"
+                                           topic_name="/cmd/sentry_posture"/>
+                    </ForceSuccess>
+                  </Sequence>
+                  <ForceSuccess>
+                    <SwitchSentryPosture target_posture="1"
+                                         topic_name="/cmd/sentry_posture"/>
+                  </ForceSuccess>
+                </Fallback>
+              </Sequence>
+              <Sequence>
+                <IsAttacked vision_data="{@vision_string_data}"
+                            key_port="{@referee_robotStatus}"/>
+                <Fallback>
+                  <Sequence>
+                    <IsPowerPostureAvailable hp_threshold="250"
+                                             key_port="{@referee_robotStatus}"
+                                             type="5"/>
+                    <ForceSuccess>
+                      <SwitchSentryPosture target_posture="5"
+                                           topic_name="/cmd/sentry_posture"/>
+                    </ForceSuccess>
+                  </Sequence>
+                  <ForceSuccess>
+                    <SwitchSentryPosture target_posture="2"
+                                         topic_name="/cmd/sentry_posture"/>
+                  </ForceSuccess>
+                </Fallback>
+              </Sequence>
+              <ForceSuccess>
+                <SwitchSentryPosture target_posture="3"
+                                     topic_name="/cmd/sentry_posture"/>
+              </ForceSuccess>
+            </Fallback>
+            <WaitDuration key_port="{@vision_string_data}"
+                          duration_sec="30.0"/>
+          </ReactiveSequence>
+          <NextWaypoint total_waypoints="{patrol_total_wp}"
+                        wp_idx="{patrol_wp_idx}"/>
+        </Sequence>
+      </KeepRunningUntilFailure>
+    </Sequence>
+  </BehaviorTree>
+
+  <BehaviorTree ID="patrol_nav(old)">
+    <Sequence>
+      <ReactiveSequence>
+        <PubNav2Goal goal="0;0;0"
+                     goal_out="{goal_out}"
+                     topic_name="goal_pose"/>
+        <Fallback>
+          <Sequence>
+            <IsDetectEnemy key_port="{@vision_string_data}"/>
+            <ForceSuccess>
+              <SwitchSentryPosture target_posture="1"
+                                   topic_name="/cmd/sentry_posture"/>
+            </ForceSuccess>
+          </Sequence>
+          <ForceSuccess>
+            <SwitchSentryPosture target_posture="3"
+                                 topic_name="/cmd/sentry_posture"/>
+          </ForceSuccess>
+        </Fallback>
+      </ReactiveSequence>
+      <WaitDuration key_port="{@vision_string_data}"
+                    duration_sec="60"/>
+      <Fallback>
+        <Sequence>
+          <IsDetectEnemy key_port="{@vision_string_data}"/>
+          <ForceSuccess>
+            <SwitchSentryPosture target_posture="1"
+                                 topic_name="/cmd/sentry_posture"/>
+          </ForceSuccess>
+          <PublishTwist v_y="0.0"
+                        v_yaw="0.0"
+                        v_x="0.0"
+                        duration="0.0"
+                        topic_name="cmd_vel"/>
+        </Sequence>
+        <ReactiveSequence>
+          <PubNav2Goal goal="0;0;0"
+                       goal_out="{goal_out}"
+                       topic_name="goal_pose"/>
+          <Fallback>
+            <Sequence>
+              <IsDetectEnemy key_port="{@vision_string_data}"/>
+              <ForceSuccess>
+                <SwitchSentryPosture target_posture="1"
+                                     topic_name="/cmd/sentry_posture"/>
+              </ForceSuccess>
+            </Sequence>
+            <ForceSuccess>
+              <SwitchSentryPosture target_posture="3"
+                                   topic_name="/cmd/sentry_posture"/>
+            </ForceSuccess>
+          </Fallback>
+        </ReactiveSequence>
+      </Fallback>
+      <WaitDuration key_port="{@vision_string_data}"
+                    duration_sec="60"/>
+    </Sequence>
+  </BehaviorTree>
+
+  <BehaviorTree ID="rmuc_2026">
+    <KeepRunningUntilFailure>
+      <ForceSuccess>
+        <ReactiveSequence>
+          <SubTree ID="check_game_start"/>
+          <SubTree ID="check_robot_status"/>
+          <SubTree ID="waypoint_patrol"/>
+        </ReactiveSequence>
+      </ForceSuccess>
+    </KeepRunningUntilFailure>
+  </BehaviorTree>
+
+  <BehaviorTree ID="waypoint_nav">
+    <Sequence>
+      <LoadWaypoints total_waypoints="{total_wp}"
+                     wait_times="{wait_times}"
+                     waypoints="{waypoints}"
+                     frame_id="map"
+                     waypoint_file="/home/vgd/code/ros_ws/csv/waypoint_nav.csv"/>
+      <Script code="wp_idx:=0; reached_last:=0"/>
+      <KeepRunningUntilFailure>
+        <ForceSuccess>
+          <Sequence>
+            <GetCurrentWaypoint current_goal="{current_goal}"
+                                current_wait_sec="{wait_sec}"
+                                wp_idx="{wp_idx}"
+                                wait_times="{wait_times}"
+                                waypoints="{waypoints}"/>
+            <ReactiveFallback>
+              <Sequence>
+                <IsFlagSet flag_name="reached_last"/>
+                <Fallback>
+                  <Sequence>
+                    <IsDetectEnemy key_port="{@vision_string_data}"/>
+                    <ForceSuccess>
+                      <SwitchSentryPosture target_posture="1"
+                                           topic_name="/cmd/sentry_posture"/>
+                    </ForceSuccess>
+                  </Sequence>
+                  <Sequence>
+                    <IsAttacked vision_data="{@vision_string_data}"
+                                key_port="{@referee_robotStatus}"/>
+                    <ForceSuccess>
+                      <SwitchSentryPosture target_posture="2"
+                                           topic_name="/cmd/sentry_posture"/>
+                    </ForceSuccess>
+                  </Sequence>
+                  <ForceSuccess>
+                    <SwitchSentryPosture target_posture="3"
+                                         topic_name="/cmd/sentry_posture"/>
+                  </ForceSuccess>
+                </Fallback>
+                <SwitchFlag wp_idx="{wp_idx}"
+                            total_waypoints="{total_wp}"
+                            key_port="{@referee_allRobotHP}"
+                            topic_name="/cmd/switch_flag"/>
+                <PublishTwist v_y="0.0"
+                              v_yaw="0.0"
+                              v_x="0.0"
+                              duration="0.0"
+                              topic_name="cmd_vel"/>
+              </Sequence>
+              <ReactiveSequence>
+                <PubNav2GoalBB goal_pose="{current_goal}"
+                               frame_id="map"
+                               topic_name="goal_pose"/>
+                <Fallback>
+                  <Sequence>
+                    <IsDetectEnemy key_port="{@vision_string_data}"/>
+                    <ForceSuccess>
+                      <SwitchSentryPosture target_posture="1"
+                                           topic_name="/cmd/sentry_posture"/>
+                    </ForceSuccess>
+                  </Sequence>
+                  <Sequence>
+                    <IsAttacked vision_data="{@vision_string_data}"
+                                key_port="{@referee_robotStatus}"/>
+                    <ForceSuccess>
+                      <SwitchSentryPosture target_posture="2"
+                                           topic_name="/cmd/sentry_posture"/>
+                    </ForceSuccess>
+                  </Sequence>
+                  <ForceSuccess>
+                    <SwitchSentryPosture target_posture="3"
+                                         topic_name="/cmd/sentry_posture"/>
+                  </ForceSuccess>
+                </Fallback>
+                <SwitchFlag wp_idx="{wp_idx}"
+                            total_waypoints="{total_wp}"
+                            key_port="{@referee_allRobotHP}"
+                            topic_name="/cmd/switch_flag"/>
+                <WaitUntilReached robot_base_frame="gimbal_yaw_fake"
+                                  tolerance="0.500000"
+                                  goal_pose="{current_goal}"/>
+              </ReactiveSequence>
+            </ReactiveFallback>
+            <WaitDuration key_port="{@vision_string_data}"
+                          duration_sec="0.0"/>
+            <ForceSuccess>
+              <Sequence>
+                <IsLastWaypoint wp_idx="{wp_idx}"
+                                total_waypoints="{total_wp}"/>
+                <Script code="reached_last:=1"/>
+              </Sequence>
+            </ForceSuccess>
+            <NextWaypoint total_waypoints="{total_wp}"
+                          wp_idx="{wp_idx}"/>
+          </Sequence>
+        </ForceSuccess>
+      </KeepRunningUntilFailure>
+    </Sequence>
+  </BehaviorTree>
+
+  <BehaviorTree ID="waypoint_patrol">
+    <ReactiveFallback>
+      <ReactiveSequence>
+        <IsEnemyOutpostDead enemy_outpost_flag="0"
+                            key_port="{@referee_allRobotHP}"/>
+        <ForceSuccess>
+          <SubTree ID="patrol_nav"/>
+        </ForceSuccess>
+      </ReactiveSequence>
+      <SubTree ID="waypoint_nav"/>
+    </ReactiveFallback>
+  </BehaviorTree>
+
+  <!-- Description of Node Models (used by Groot) -->
+  <TreeNodesModel>
+    <Action ID="GetCurrentWaypoint">
+      <output_port name="current_goal"
+                   type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;">当前目标点</output_port>
+      <output_port name="current_wait_sec"
+                   type="double">当前航点的等待时间</output_port>
+      <input_port name="wp_idx"
+                  type="int">当前航点索引</input_port>
+      <input_port name="wait_times"
+                  type="std::vector&lt;double, std::allocator&lt;double&gt; &gt;">每个航点的等待时间列表</input_port>
+      <input_port name="waypoints"
+                  type="std::vector&lt;geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;, std::allocator&lt;geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt; &gt; &gt;">航点列表</input_port>
+    </Action>
+    <Condition ID="IsAttacked">
+      <input_port name="vision_data"
+                  default="{@vision_string_data}"
+                  type="std_msgs::msg::String_&lt;std::allocator&lt;void&gt; &gt;">Vision string data port on blackboard</input_port>
+      <input_port name="key_port"
+                  default="{@referee_robotStatus}"
+                  type="pb_rm_interfaces::msg::RobotStatus_&lt;std::allocator&lt;void&gt; &gt;">RobotStatus port on blackboard</input_port>
+    </Condition>
+    <Condition ID="IsDetectEnemy">
+      <input_port name="key_port"
+                  default="{@vision_string_data}"
+                  type="std_msgs::msg::String_&lt;std::allocator&lt;void&gt; &gt;">Vision string data port on blackboard</input_port>
+    </Condition>
+    <Condition ID="IsEnemyInRange">
+      <input_port name="max_distance"
+                  default="5.000000"
+                  type="double">Maximum engagement distance (meters)</input_port>
+      <input_port name="key_port"
+                  default="{@vision_string_data}"
+                  type="std_msgs::msg::String_&lt;std::allocator&lt;void&gt; &gt;">Vision string data port on blackboard</input_port>
+    </Condition>
+    <Condition ID="IsEnemyOutpostDead">
+      <input_port name="enemy_outpost_flag"
+                  default="1"
+                  type="int">Flag of Outpost. NOTE: 1: dead; 0: survival</input_port>
+      <input_port name="key_port"
+                  default="{@referee_allRobotHP}"
+                  type="pb_rm_interfaces::msg::GameRobotHP_&lt;std::allocator&lt;void&gt; &gt;">AllRobotHP port on blackboard</input_port>
+    </Condition>
+    <Condition ID="IsFlagSet">
+      <input_port name="flag_name"
+                  type="std::string">黑板上要检查的 int 标志名</input_port>
+    </Condition>
+    <Condition ID="IsGameStatus">
+      <input_port name="max_remain_time"
+                  default="420"
+                  type="int"/>
+      <input_port name="min_remain_time"
+                  default="0"
+                  type="int"/>
+      <input_port name="expected_game_progress"
+                  default="4"
+                  type="int"/>
+      <input_port name="key_port"
+                  default="{@referee_gameStatus}"
+                  type="pb_rm_interfaces::msg::GameStatus_&lt;std::allocator&lt;void&gt; &gt;"/>
+    </Condition>
+    <Condition ID="IsLastWaypoint">
+      <input_port name="wp_idx"
+                  type="int">当前航点索引</input_port>
+      <input_port name="total_waypoints"
+                  type="int">航点总数</input_port>
+    </Condition>
+    <Condition ID="IsPowerPostureAvailable">
+      <input_port name="hp_threshold"
+                  default="100"
+                  type="unsigned short">HP threshold for PowerDefense (only used when type=5)</input_port>
+      <input_port name="key_port"
+                  default="{@referee_robotStatus}"
+                  type="pb_rm_interfaces::msg::RobotStatus_&lt;std::allocator&lt;void&gt; &gt;">RobotStatus port on blackboard</input_port>
+      <input_port name="type"
+                  type="unsigned char">Reinforcement posture type: 4=PowerAttack, 5=PowerDefense, 6=PowerMove</input_port>
+    </Condition>
+    <Condition ID="IsRfidDetected">
+      <input_port name="friendly_supply_zone_exchange"
+                  default="false"
+                  type="bool"/>
+      <input_port name="friendly_supply_zone_non_exchange"
+                  default="false"
+                  type="bool"/>
+      <input_port name="center_gain_point"
+                  default="false"
+                  type="bool"/>
+      <input_port name="friendly_fortress_gain_point"
+                  default="false"
+                  type="bool"/>
+      <input_port name="key_port"
+                  default="{@referee_rfidStatus}"
+                  type="pb_rm_interfaces::msg::RfidStatus_&lt;std::allocator&lt;void&gt; &gt;"/>
+    </Condition>
+    <Condition ID="IsStatusOK">
+      <input_port name="ammo_min"
+                  default="0"
+                  type="int"/>
+      <input_port name="heat_max"
+                  default="350"
+                  type="int"/>
+      <input_port name="hp_min"
+                  default="300"
+                  type="int"/>
+      <input_port name="key_port"
+                  default="{@referee_robotStatus}"
+                  type="pb_rm_interfaces::msg::RobotStatus_&lt;std::allocator&lt;void&gt; &gt;"/>
+    </Condition>
+    <Action ID="LoadWaypoints">
+      <output_port name="total_waypoints"
+                   type="int">航点总数</output_port>
+      <output_port name="wait_times"
+                   type="std::vector&lt;double, std::allocator&lt;double&gt; &gt;">每个航点的等待时间 (秒)</output_port>
+      <output_port name="waypoints"
+                   type="std::vector&lt;geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;, std::allocator&lt;geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt; &gt; &gt;">航点列表</output_port>
+      <input_port name="frame_id"
+                  default="map"
+                  type="std::string">坐标系 ID</input_port>
+      <input_port name="waypoint_file"
+                  type="std::string">航点 CSV 文件的绝对路径</input_port>
+    </Action>
+    <Action ID="NextWaypoint">
+      <input_port name="total_waypoints"
+                  type="int">航点总数</input_port>
+      <inout_port name="wp_idx"
+                  type="int">当前航点索引</inout_port>
+    </Action>
+    <Condition ID="PubNav2Goal">
+      <input_port name="goal"
+                  default="0;0;0"
+                  type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;">Expected goal pose that send to nav2. Fill with format `x;y;yaw`</input_port>
+      <output_port name="goal_out"
+                   default="{goal_out}"
+                   type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;">Published goal pose</output_port>
+      <input_port name="topic_name"
+                  default="__default__placeholder__"
+                  type="std::string">Topic name</input_port>
+    </Condition>
+    <Condition ID="PubNav2GoalBB">
+      <input_port name="goal_pose"
+                  type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;">导航目标位置</input_port>
+      <input_port name="frame_id"
+                  default="map"
+                  type="std::string">坐标系ID，默认为map</input_port>
+      <input_port name="topic_name"
+                  default="__default__placeholder__"
+                  type="std::string">Topic name</input_port>
+    </Condition>
+    <Action ID="PublishTwist">
+      <input_port name="v_y"
+                  default="0.000000"
+                  type="double"/>
+      <input_port name="v_yaw"
+                  default="0.000000"
+                  type="double"/>
+      <input_port name="v_x"
+                  default="0.000000"
+                  type="double"/>
+      <input_port name="duration"
+                  type="std::chrono::milliseconds"/>
+      <input_port name="topic_name"
+                  default="__default__placeholder__"
+                  type="std::string"/>
+    </Action>
+    <Decorator ID="RetryUntilSuccess"
+               editable="true"/>
+    <Condition ID="SwitchFlag">
+      <input_port name="wp_idx"
+                  type="int">当前航点索引</input_port>
+      <input_port name="total_waypoints"
+                  type="int">航点总数</input_port>
+      <input_port name="key_port"
+                  default="{@referee_allRobotHP}"
+                  type="pb_rm_interfaces::msg::GameRobotHP_&lt;std::allocator&lt;void&gt; &gt;">GameRobotHP port on blackboard</input_port>
+      <input_port name="topic_name"
+                  default="__default__placeholder__"
+                  type="std::string">Topic name</input_port>
+    </Condition>
+    <Condition ID="SwitchSentryPosture">
+      <input_port name="target_posture"
+                  type="unsigned char">Target posture ID (1: Attack, 2: Defense, 3: Move)</input_port>
+      <input_port name="topic_name"
+                  default="__default__placeholder__"
+                  type="std::string">Topic name</input_port>
+    </Condition>
+    <Action ID="WaitDuration">
+      <input_port name="key_port"
+                  default="{@vision_string_data}"
+                  type="std_msgs::msg::String_&lt;std::allocator&lt;void&gt; &gt;">Vision string data port on blackboard</input_port>
+      <input_port name="duration_sec"
+                  default="5.000000"
+                  type="double">连续无敌人的等待时长 (秒), 0 则跳过</input_port>
+    </Action>
+    <Action ID="WaitUntilReached">
+      <input_port name="robot_base_frame"
+                  default="gimbal_yaw_fake"
+                  type="std::string">机器人基座坐标系</input_port>
+      <input_port name="tolerance"
+                  default="0.500000"
+                  type="double">到达判定距离阈值 (m)</input_port>
+      <input_port name="goal_pose"
+                  type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;">目标位姿</input_port>
+    </Action>
+  </TreeNodesModel>
+
+</root>
