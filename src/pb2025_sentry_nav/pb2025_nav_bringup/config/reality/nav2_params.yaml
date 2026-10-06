@@ -21,87 +21,6 @@ robot_state_publisher:
     use_sim_time: False
     publish_frequency: 200.0
 
-# hik_camera_ros2_driver:
-#   ros__parameters:
-#     use_sim_time: False
-#     camera_info_url: "package://pb2025_sentry_bringup/params/camera_info.yaml"
-#     pixel_format: "BayerRG8"        # Recommended Option: RGB8Packed, BayerRG8
-#     adc_bit_depth: "Bits_8"         # If using BayerRG8, adc_bit_depth must be Bits_8; otherwise, it can be Bits_8 or Bits_12
-#     use_sensor_data_qos: true
-#     camera_name: "front_industrial_camera"
-#     # frame_id: "optical_frame"     # If not set, it will be set as <camera_name>_optical_frame
-#     # camera_topic: "image"         # If not set, it will be set as <camera_name>/image
-
-#     acquisition_frame_rate: 165.0   # Unit: Hz
-#     exposure_time: 5000             # Unit: us
-#     gain: 12.0                      # Range: 0.0 ~ 16.9, Unit: dB
-
-# armor_detector_opencv:
-#   ros__parameters:
-#     use_sim_time: False
-#     debug: false
-#     camera_name: "front_industrial_camera"
-
-#     detect_color: 0
-#     binary_thres: 80
-
-#     light.min_ratio: 0.1
-#     armor.min_light_ratio: 0.8
-
-#     classifier_threshold: 0.25
-#     ignore_classes: ["negative"]
-
-# armor_detector_openvino:
-#   ros__parameters:
-#     use_sim_time: False
-#     use_sensor_data_qos: true
-#     debug_mode: false
-#     detect_color: 0
-#     detector:
-#       camera_name: "front_industrial_camera"
-#       subscribe_compressed: false
-#       model_path: $(find-pkg-share armor_detector_openvino)/model/opt-1208-001.onnx
-#       device_type: "AUTO"
-#       confidence_threshold: 0.25
-#       top_k: 128
-#       nms_threshold: 0.3
-
-# armor_tracker:
-#   ros__parameters:
-#     use_sim_time: False
-#     target_frame: gimbal_pitch_odom
-#     max_armor_distance: 10.0
-
-#     ekf:
-#       sigma2_q_xyz: 0.05
-#       sigma2_q_yaw: 5.0
-#       sigma2_q_r: 80.0
-
-#       r_xyz_factor: 0.0004
-#       r_yaw: 0.003
-
-#     tracker:
-#       max_match_distance: 0.5
-#       max_match_yaw_diff: 1.0
-
-#       tracking_thres: 5
-#       lost_time_thres: 1.0
-
-# projectile_motion:
-#   ros__parameters:
-#     use_sim_time: False
-#     projectile:
-#       offset_pitch: 0.0
-#       offset_yaw: 0.0
-#       offset_time: 0.1
-#       initial_speed: 21.5
-#       target_frame: "gimbal_pitch"              # gimbal frame_id
-#       target_topic: "tracker/target"
-#       gimbal_cmd_topic: "cmd_gimbal"
-#       shoot_cmd_topic: "cmd_shoot"
-#       solver_type: "gravity"                    # projectile solve method: gravity / gaf
-#       # friction: 0.001                         # Air resistance factor if use GAF solver
-
 livox_ros_driver2:
   ros__parameters:
     xfer_format: 4                                      # 0-PointCloud2Msg(PointXYZRTL), 1-LivoxCustomMsg, 2-PclPxyziMsg, 3-LivoxImuMsg, 4-AllMsg
@@ -601,10 +520,11 @@ map_saver:
     occupied_thresh_default: 0.65
     map_subscribe_transient_local: True
 
+
 planner_server:
   ros__parameters:
     use_sim_time: False
-    expected_planner_frequency: 5.0
+    expected_planner_frequency: 20.0
     planner_plugins: ["GridBased"]
     GridBased:
       plugin: "nav2_theta_star_planner/ThetaStarPlanner" # In Iron and older versions, "/" was used instead of "::"
@@ -612,7 +532,6 @@ planner_server:
       w_euc_cost: 1.0
       w_traversal_cost: 10.0 
       w_heuristic_cost: 1.0
-
 
 # smoother_server:
 #   ros__parameters:
@@ -626,36 +545,18 @@ planner_server:
 
 smoother_server:
   ros__parameters:
-    use_sim_time: True
-    smoother_plugins: ["SmoothPath"]
-
-    SmoothPath:
-      plugin: "nav2_constrained_smoother/ConstrainedSmoother"
-      reversing_enabled: false      # whether to detect forward/reverse direction and cusps. Should be set to false for paths without orientations assigned
-      path_downsampling_factor: 2  # every n-th node of the path is taken. Useful for speed-up
-      path_upsampling_factor: 1     # 0 - path remains downsampled, 1 - path is upsampled back to original granularity using cubic bezier, 2... - more upsampling
-      keep_start_orientation: true  # whether to prevent the start orientation from being smoothed
-      keep_goal_orientation: true   # whether to prevent the gpal orientation from being smoothed
-      minimum_turning_radius: 0.0  # minimum turning radius the robot can perform. Can be set to 0.0 (or w_curve can be set to 0.0 with the same effect) for diff-drive/holonomic robots
-      w_curve: 0.5                  # weight to enforce minimum_turning_radius
-      w_dist: 0.0                   # weight to bind path to original as optional replacement for cost weight
-      w_smooth: 2000000.0          # weight to maximize smoothness of path
-      w_cost: 0.15           # weight to steer robot away from collision and cost
-
-      # Parameters used to improve obstacle avoidance near cusps (forward/reverse movement changes)
-      w_cost_cusp_multiplier: 3.0   # option to use higher weight during forward/reverse direction change which is often accompanied with dangerous rotations
-      cusp_zone_length: 2.5         # length of the section around cusp in which nodes use w_cost_cusp_multiplier (w_cost rises gradually inside the zone towards the cusp point, whose costmap weight eqals w_cost*w_cost_cusp_multiplier)
-
-      # Points in robot frame to grab costmap values from. Format: [x1, y1, weight1, x2, y2, weight2, ...]
-      # IMPORTANT: Requires much higher number of iterations to actually improve the path. Uncomment only if you really need it (highly elongated/asymmetric robots)
-      # cost_check_points: [-0.185, 0.0, 1.0]
-
-      optimizer:
-        max_iterations: 100            # max iterations of smoother
-        debug_optimizer: false        # print debug info
-        gradient_tol: 50.0
-        fn_tol: 1.0e-15
-        param_tol: 1.0e-20
+    costmap_topic: global_costmap/costmap_raw
+    footprint_topic: global_costmap/published_footprint
+    robot_base_frame: gimbal_yaw_fake
+    transform_tolerance: 0.1
+    smoother_plugins: ["savitzky_golay_smoother"]
+    savitzky_golay_smoother:
+      plugin: "nav2_smoother::SavitzkyGolaySmoother"
+      window_size: 7
+      poly_order: 3
+      do_refinement: True
+      refinement_num: 2
+      enforce_path_inversion: True
 
 behavior_server:
   ros__parameters:
