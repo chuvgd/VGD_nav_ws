@@ -1,3 +1,6 @@
 csv
 .vscode
 /rmuc2026
+build
+install
+log
