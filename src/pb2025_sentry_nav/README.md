@@ -96,7 +96,7 @@ docker run -it --rm --name pb2025_sentry_nav \
 
     ```bash
     sudo apt install -y libeigen3-dev libomp-dev
-
+    
     git clone https://github.com/koide3/small_gicp.git
     cd small_gicp
     mkdir build && cd build
@@ -128,7 +128,7 @@ rosdep install -r --from-paths src --ignore-src --rosdistro $ROS_DISTRO -y
 ```
 
 ```bash
-colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release --parallel-workers 4
 ```
 
 > [!NOTE]

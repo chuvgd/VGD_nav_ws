@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root BTCPP_format="4">
+  <BehaviorTree ID="test_pursuit">
+    <KeepRunningUntilFailure>
+      <Sequence>
+        <ReactiveSequence>
+          <PubNav2Goal goal="2;0;0"
+                       goal_out="{goal_out}"
+                       topic_name="goal_pose"/>
+          <WaitUntilReached robot_base_frame="gimbal_yaw_fake"
+                            tolerance="0.500000"
+                            goal_pose="2;0;0"/>
+        </ReactiveSequence>
+        <WhileDoElse>
+          <IsDetectEnemy key_port="{@vision_string_data}"/>
+          <KeepRunningUntilFailure>
+            <Fallback>
+              <ReactiveSequence>
+                <IsEnemyInRange max_distance="3.000000"
+                                key_port="{@vision_string_data}"/>
+                <CalculateAttackPose costmap_port="{@nav_globalCostmap}"
+                                     tracker_port="{@vision_string_data}"
+                                     goal="{attack_pose}"
+                                     topic_name="debug_attack_pose"/>
+                <PubNav2Goal goal="{attack_pose}"
+                             goal_out="{goal_out}"
+                             topic_name="goal_pose"/>
+              </ReactiveSequence>
+              <AlwaysSuccess/>
+            </Fallback>
+          </KeepRunningUntilFailure>
+          <AlwaysSuccess/>
+        </WhileDoElse>
+      </Sequence>
+    </KeepRunningUntilFailure>
+  </BehaviorTree>
+
+  <!-- Description of Node Models (used by Groot) -->
+  <TreeNodesModel>
+    <Condition ID="CalculateAttackPose">
+      <input_port name="costmap_port"
+                  default="{@nav_globalCostmap}"
+                  type="nav_msgs::msg::OccupancyGrid_&lt;std::allocator&lt;void&gt; &gt;">GlobalCostmap port on blackboard</input_port>
+      <input_port name="tracker_port"
+                  default="{@vision_string_data}"
+                  type="std_msgs::msg::String_&lt;std::allocator&lt;void&gt; &gt;">Vision target port on blackboard</input_port>
+      <output_port name="goal"
+                   default="{attack_pose}"
+                   type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;">Expected goal pose that send to nav2. Fill with format `x;y;yaw`</output_port>
+      <input_port name="topic_name"
+                  default="__default__placeholder__"
+                  type="std::string">Topic name</input_port>
+    </Condition>
+    <Condition ID="IsDetectEnemy">
+      <input_port name="key_port"
+                  default="{@vision_string_data}"
+                  type="std_msgs::msg::String_&lt;std::allocator&lt;void&gt; &gt;">Vision string data port on blackboard</input_port>
+    </Condition>
+    <Condition ID="IsEnemyInRange">
+      <input_port name="max_distance"
+                  default="5.000000"
+                  type="double">Maximum engagement distance (meters)</input_port>
+      <input_port name="key_port"
+                  default="{@vision_string_data}"
+                  type="std_msgs::msg::String_&lt;std::allocator&lt;void&gt; &gt;">Vision string data port on blackboard</input_port>
+    </Condition>
+    <Condition ID="PubNav2Goal">
+      <input_port name="goal"
+                  default="0;0;0"
+                  type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;">Expected goal pose that send to nav2. Fill with format `x;y;yaw`</input_port>
+      <output_port name="goal_out"
+                   default="{goal_out}"
+                   type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;">Published goal pose</output_port>
+      <input_port name="topic_name"
+                  default="__default__placeholder__"
+                  type="std::string">Topic name</input_port>
+    </Condition>
+    <Action ID="WaitUntilReached">
+      <input_port name="robot_base_frame"
+                  default="gimbal_yaw_fake"
+                  type="std::string">机器人基座坐标系</input_port>
+      <input_port name="tolerance"
+                  default="0.500000"
+                  type="double">到达判定距离阈值 (m)</input_port>
+      <input_port name="goal_pose"
+                  type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;">目标位姿</input_port>
+    </Action>
+  </TreeNodesModel>
+
+</root>

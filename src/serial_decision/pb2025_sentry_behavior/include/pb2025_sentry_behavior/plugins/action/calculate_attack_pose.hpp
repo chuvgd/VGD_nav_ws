@@ -41,11 +41,12 @@ class CalculateAttackPoseAction : public BT::RosTopicPubNode<visualization_msgs:
 public:
   CalculateAttackPoseAction(
     const std::string & instance_name, const BT::NodeConfig & conf,
-    const BT::RosNodeParams & params);
+    const BT::RosNodeParams & params);//构造函数
 
-  bool setMessage(visualization_msgs::msg::MarkerArray & msg) override;
+  //核心函数，计算攻击点并发布可视化Marker
+  bool setMessage(visualization_msgs::msg::MarkerArray & msg) override;//虚函数重写，设置消息
 
-  static BT::PortsList providedPorts();
+  static BT::PortsList providedPorts();//静态成员函数，提供端口列表
 
 private:
   struct Parameters
@@ -54,11 +55,14 @@ private:
     int num_sectors;
     int cost_threshold;
     std::string robot_base_frame;
+    std::string gimbal_frame;
     double transform_tolerance;
     double max_visualization_distance;
     double marker_scale_base;
     bool visualize;
-  };
+  };//参数结构体
+
+  bool parseVisionString(const std::string & data, double & x, double & y, bool & detected);//解析视觉数据字符串
 
   std::vector<Point> generateCandidatePoints(const Point & enemy_position);
 

@@ -14,7 +14,9 @@
 
 #include "pb2025_sentry_behavior/plugins/action/calculate_attack_pose.hpp"
 
-#include "auto_aim_interfaces/msg/target.hpp"
+#include <sstream>
+
+#include "std_msgs/msg/string.hpp"
 #include "nav2_util/node_utils.hpp"
 #include "nav2_util/robot_utils.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
@@ -23,6 +25,28 @@
 using nav2_util::declare_parameter_if_not_declared;
 namespace pb2025_sentry_behavior
 {
+/// 视觉串格式: "x,y,flag,id"
+/// x,y: 云台系下目标位置(m)；flag: 1=锁定目标；id: 目标编号
+bool CalculateAttackPoseAction::parseVisionString(const std::string & data, double & x, double & y, bool & detected)
+{
+  std::vector<std::string> parts;
+  std::stringstream ss(data);
+  std::string item;
+  while (std::getline(ss, item, ',')) {
+    parts.push_back(item);
+  }
+  if (parts.size() < 3) {
+    return false;
+  }
+  try {
+    x = std::stod(parts[0]);
+    y = std::stod(parts[1]);
+    detected = std::stod(parts[2]) != 0.0;
+  } catch (const std::exception &) {
+    return false;
+  }
+  return true;
+}
 
 CalculateAttackPoseAction::CalculateAttackPoseAction(
   const std::string & name, const BT::NodeConfig & config, const BT::RosNodeParams & params)
@@ -37,6 +61,8 @@ CalculateAttackPoseAction::CalculateAttackPoseAction(
   declare_parameter_if_not_declared(
     node_, name + ".robot_base_frame", rclcpp::ParameterValue("chassis"));
   declare_parameter_if_not_declared(
+    node_, name + ".gimbal_frame", rclcpp::ParameterValue("gimbal_yaw"));
+  declare_parameter_if_not_declared(
     node_, name + ".transform_tolerance", rclcpp::ParameterValue(0.5));
   declare_parameter_if_not_declared(
     node_, name + ".max_visualization_distance", rclcpp::ParameterValue(6.0));
@@ -48,6 +74,7 @@ CalculateAttackPoseAction::CalculateAttackPoseAction(
   node_->get_parameter(name + ".num_sectors", params_.num_sectors);
   node_->get_parameter(name + ".cost_threshold", params_.cost_threshold);
   node_->get_parameter(name + ".robot_base_frame", params_.robot_base_frame);
+  node_->get_parameter(name + ".gimbal_frame", params_.gimbal_frame);
   node_->get_parameter(name + ".transform_tolerance", params_.transform_tolerance);
   node_->get_parameter(name + ".max_visualization_distance", params_.max_visualization_distance);
   node_->get_parameter(name + ".marker_scale_base", params_.marker_scale_base);
@@ -59,8 +86,8 @@ BT::PortsList CalculateAttackPoseAction::providedPorts()
   return providedBasicPorts({
     BT::InputPort<nav_msgs::msg::OccupancyGrid>(
       "costmap_port", "{@nav_globalCostmap}", "GlobalCostmap port on blackboard"),
-    BT::InputPort<auto_aim_interfaces::msg::Target>(
-      "tracker_port", "{@tracker_target}", "Vision target port on blackboard"),
+    BT::InputPort<std_msgs::msg::String>(
+      "tracker_port", "{@vision_string_data}", "Vision target port on blackboard"),
     BT::OutputPort<PoseStamped>(
       "goal", "{attack_pose}", "Expected goal pose that send to nav2. Fill with format `x;y;yaw`"),
   });
@@ -69,7 +96,7 @@ BT::PortsList CalculateAttackPoseAction::providedPorts()
 bool CalculateAttackPoseAction::setMessage(visualization_msgs::msg::MarkerArray & msg)
 {
   auto global_costmap = getInput<nav_msgs::msg::OccupancyGrid>("costmap_port");
-  auto tracker_target = getInput<auto_aim_interfaces::msg::Target>("tracker_port");
+  auto tracker_target = getInput<std_msgs::msg::String>("tracker_port");
 
   if (!global_costmap) {
     RCLCPP_ERROR(node_->get_logger(), "Missing required input: costmap_port");
@@ -84,23 +111,41 @@ bool CalculateAttackPoseAction::setMessage(visualization_msgs::msg::MarkerArray 
   std::vector<Point> feasible_points;
   PoseStamped robot_pose;
 
-  // If tracker lost target, use last known center position
-  if (!tracker_target->tracking && tracker_target->id == "") {
-    RCLCPP_INFO(
-      node_->get_logger(),
-      "Tracker target is not currently being tracked. Directing to last known position.");
-    if (enemy_on_costmap_.point.x == 0 && enemy_on_costmap_.point.y == 0) {
-      RCLCPP_WARN(node_->get_logger(), "No last known position to direct to.");
-      return false;
-    }
-    PoseStamped pose;
-    pose.pose.position = enemy_on_costmap_.point;
-    setOutput("goal", pose);
-  } else {
-    // Transform enemy position
+  // 解析视觉串: "x,y,flag,id"
+  double enemy_x = 0.0;
+  double enemy_y = 0.0;
+  bool detected = false;
+  if (!parseVisionString(tracker_target->data, enemy_x, enemy_y, detected)) {
+    RCLCPP_WARN(node_->get_logger(), "Invalid vision data: '%s'", tracker_target->data.c_str());
+    return false;
+  }
+
+  // flag 为 0 表示未锁定目标，前往最后一次已知的敌人位置
+  // if (!detected) {
+  //   RCLCPP_INFO(
+  //     node_->get_logger(),
+  //     "Tracker target is not currently being tracked. Directing to last known position.");
+  //   if (enemy_on_costmap_.point.x == 0 && enemy_on_costmap_.point.y == 0) {
+  //     RCLCPP_WARN(node_->get_logger(), "No last known position to direct to.");
+  //     return false;
+  //   }
+  //   PoseStamped pose;
+  //   pose.header = enemy_on_costmap_.header;
+  //   pose.pose.position = enemy_on_costmap_.point;
+  //   setOutput("goal", pose);
+  // } 
+  if (!detected) {
+    RCLCPP_WARN_THROTTLE(
+      node_->get_logger(), *node_->get_clock(), 2000, "Tracker target is not tracked (flag=0)");
+    return false;
+  }else {
+    // 视觉给的 (x, y) 在云台系下，转换到全局代价地图坐标系
     PointStamped enemy_point;
-    enemy_point.header = tracker_target->header;
-    enemy_point.point = tracker_target->position;
+    enemy_point.header.frame_id = params_.gimbal_frame;
+    enemy_point.header.stamp = node_->now();
+    enemy_point.point.x = enemy_x;
+    enemy_point.point.y = enemy_y;
+    enemy_point.point.z = 0.0;
     if (!transformPoseInTargetFrame(
           enemy_point, enemy_on_costmap_, *tf_buffer_, global_costmap->header.frame_id,
           params_.transform_tolerance)) {

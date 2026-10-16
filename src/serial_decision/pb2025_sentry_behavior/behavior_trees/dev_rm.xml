@@ -26,7 +26,7 @@
       <ForceSuccess>
         <Sequence>
           <CalculateAttackPose costmap_port="{@nav_globalCostmap}"
-                               tracker_port="{@tracker_target}"
+                               tracker_port="{@vision_string_data}"
                                goal="{attack_pose}"
                                topic_name="debug_attack_pose"/>
           <PubNav2Goal goal="{attack_pose}"
@@ -125,8 +125,8 @@
                   default="{@nav_globalCostmap}"
                   type="nav_msgs::msg::OccupancyGrid_&lt;std::allocator&lt;void&gt; &gt;">GlobalCostmap port on blackboard</input_port>
       <input_port name="tracker_port"
-                  default="{@tracker_target}"
-                  type="auto_aim_interfaces::msg::Target_&lt;std::allocator&lt;void&gt; &gt;">Vision target port on blackboard</input_port>
+                  default="{@vision_string_data}"
+                  type="std_msgs::msg::String_&lt;std::allocator&lt;void&gt; &gt;">Vision target port on blackboard</input_port>
       <output_port name="goal"
                    default="{attack_pose}"
                    type="geometry_msgs::msg::PoseStamped_&lt;std::allocator&lt;void&gt; &gt;">Expected goal pose that send to nav2. Fill with format `x;y;yaw`</output_port>
