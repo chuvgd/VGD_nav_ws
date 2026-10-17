@@ -136,7 +136,7 @@ bool CalculateAttackPoseAction::setMessage(visualization_msgs::msg::MarkerArray 
     RCLCPP_WARN_THROTTLE(
       node_->get_logger(), *node_->get_clock(), 2000, "Tracker target is not tracked (flag=0)");
     return false;
-  }else {
+  } else {
     // 视觉给的 (x, y) 在云台系下，转换到全局代价地图坐标系
     PointStamped enemy_point;
     enemy_point.header.frame_id = params_.gimbal_frame;
