@@ -118,8 +118,6 @@ bool CalculateAttackPoseAction::setMessage(visualization_msgs::msg::MarkerArray 
   if (!parseVisionString(tracker_target->data, enemy_x, enemy_y, detected)) {
     RCLCPP_WARN(node_->get_logger(), "Invalid vision data: '%s'", tracker_target->data.c_str());
     return false;
-  }
-
   // flag 为 0 表示未锁定目标，前往最后一次已知的敌人位置
   // if (!detected) {
   //   RCLCPP_INFO(
@@ -185,6 +183,7 @@ bool CalculateAttackPoseAction::setMessage(visualization_msgs::msg::MarkerArray 
         global_costmap.value());
     }
   }
+ }
   return true;
 }
 
