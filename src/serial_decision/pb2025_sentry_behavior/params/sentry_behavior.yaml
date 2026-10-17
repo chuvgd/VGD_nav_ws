@@ -24,4 +24,4 @@ pb2025_sentry_behavior_server:
 pb2025_sentry_behavior_client:
   ros__parameters:
     use_sim_time: true
-    target_tree: rmuc_2026
+    target_tree: test_pursuit

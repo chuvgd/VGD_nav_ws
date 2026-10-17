@@ -118,6 +118,7 @@ bool CalculateAttackPoseAction::setMessage(visualization_msgs::msg::MarkerArray 
   if (!parseVisionString(tracker_target->data, enemy_x, enemy_y, detected)) {
     RCLCPP_WARN(node_->get_logger(), "Invalid vision data: '%s'", tracker_target->data.c_str());
     return false;
+  }
   // flag 为 0 表示未锁定目标，前往最后一次已知的敌人位置
   // if (!detected) {
   //   RCLCPP_INFO(
@@ -136,54 +137,53 @@ bool CalculateAttackPoseAction::setMessage(visualization_msgs::msg::MarkerArray 
     RCLCPP_WARN_THROTTLE(
       node_->get_logger(), *node_->get_clock(), 2000, "Tracker target is not tracked (flag=0)");
     return false;
-  } else {
-    // 视觉给的 (x, y) 在云台系下，转换到全局代价地图坐标系
-    PointStamped enemy_point;
-    enemy_point.header.frame_id = params_.gimbal_frame;
-    enemy_point.header.stamp = node_->now();
-    enemy_point.point.x = enemy_x;
-    enemy_point.point.y = enemy_y;
-    enemy_point.point.z = 0.0;
-    if (!transformPoseInTargetFrame(
-          enemy_point, enemy_on_costmap_, *tf_buffer_, global_costmap->header.frame_id,
-          params_.transform_tolerance)) {
-      RCLCPP_ERROR(node_->get_logger(), "Failed to transform enemy position");
-      return false;
-    }
-
-    // Generate candidate points
-    candidates = generateCandidatePoints(enemy_on_costmap_.point);
-
-    // Filter feasible points
-    feasible_points = filterFeasiblePoints(candidates, global_costmap.value());
-    if (feasible_points.empty()) {
-      RCLCPP_WARN(node_->get_logger(), "No feasible attack points found");
-      return false;
-    }
-
-    // Get robot position
-    if (!nav2_util::getCurrentPose(
-          robot_pose, *tf_buffer_, global_costmap->header.frame_id, params_.robot_base_frame,
-          params_.transform_tolerance)) {
-      RCLCPP_ERROR(node_->get_logger(), "Failed to get robot pose");
-      return false;
-    }
-
-    // Select best point
-    const auto best_point = selectBestPoint(feasible_points, robot_pose.pose.position);
-
-    // Create attack pose
-    const auto attack_pose = createAttackPose(best_point, enemy_on_costmap_);
-    setOutput("goal", attack_pose);
-
-    // Create visualization
-    if (params_.visualize) {
-      createVisualizationMarkers(
-        msg, enemy_on_costmap_.point, candidates, feasible_points, robot_pose.pose.position,
-        global_costmap.value());
-    }
   }
- }
+
+  // 视觉给的 (x, y) 在云台系下，转换到全局代价地图坐标系
+  PointStamped enemy_point;
+  enemy_point.header.frame_id = params_.gimbal_frame;
+  enemy_point.header.stamp = node_->now();
+  enemy_point.point.x = enemy_x;
+  enemy_point.point.y = enemy_y;
+  enemy_point.point.z = 0.0;
+  if (!transformPoseInTargetFrame(
+        enemy_point, enemy_on_costmap_, *tf_buffer_, global_costmap->header.frame_id,
+        params_.transform_tolerance)) {
+    RCLCPP_ERROR(node_->get_logger(), "Failed to transform enemy position");
+    return false;
+  }
+
+  // Generate candidate points
+  candidates = generateCandidatePoints(enemy_on_costmap_.point);
+
+  // Filter feasible points
+  feasible_points = filterFeasiblePoints(candidates, global_costmap.value());
+  if (feasible_points.empty()) {
+    RCLCPP_WARN(node_->get_logger(), "No feasible attack points found");
+    return false;
+  }
+
+  // Get robot position
+  if (!nav2_util::getCurrentPose(
+        robot_pose, *tf_buffer_, global_costmap->header.frame_id, params_.robot_base_frame,
+        params_.transform_tolerance)) {
+    RCLCPP_ERROR(node_->get_logger(), "Failed to get robot pose");
+    return false;
+  }
+
+  // Select best point
+  const auto best_point = selectBestPoint(feasible_points, robot_pose.pose.position);
+
+  // Create attack pose
+  const auto attack_pose = createAttackPose(best_point, enemy_on_costmap_);
+  setOutput("goal", attack_pose);
+
+  // Create visualization
+  if (params_.visualize) {
+    createVisualizationMarkers(
+      msg, enemy_on_costmap_.point, candidates, feasible_points, robot_pose.pose.position,
+      global_costmap.value());
+  }
   return true;
 }
 
