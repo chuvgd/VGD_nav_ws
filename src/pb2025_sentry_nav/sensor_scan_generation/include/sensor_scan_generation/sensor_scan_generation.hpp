@@ -41,16 +41,17 @@ private:
     const nav_msgs::msg::Odometry::ConstSharedPtr & odometry,
     const sensor_msgs::msg::PointCloud2::ConstSharedPtr & laserCloud2);
 
-  tf2::Transform getTransform(
-    const std::string & target_frame, const std::string & source_frame, const rclcpp::Time & time);
+  bool getTransform(
+    const std::string & target_frame, const std::string & source_frame, const rclcpp::Time & time,
+    tf2::Transform & transform);
 
   void publishTransform(
     const tf2::Transform & transform, const std::string & parent_frame,
     const std::string & child_frame, const rclcpp::Time & stamp);
 
   void publishOdometry(
-    const tf2::Transform & transform, std::string parent_frame, const std::string & child_frame,
-    const rclcpp::Time & stamp);
+    const tf2::Transform & transform, const std::string & parent_frame,
+    const std::string & child_frame, const rclcpp::Time & stamp);
 
   std::string lidar_frame_;
   std::string base_frame_;
@@ -70,7 +71,18 @@ private:
     nav_msgs::msg::Odometry, sensor_msgs::msg::PointCloud2>;
   std::unique_ptr<message_filters::Synchronizer<SyncPolicy>> sync_;
 
-  tf2::Transform tf_lidar_to_robot_base_;
+  double min_dt_;
+  double max_dt_;
+  double max_sync_skew_;
+  double transform_timeout_;
+
+  // History belongs to this node instance and is committed only for valid samples.
+  bool has_previous_pose_{false};
+  tf2::Transform previous_transform_{tf2::Transform::getIdentity()};
+  tf2::Quaternion previous_orientation_{0.0, 0.0, 0.0, 1.0};
+  tf2::Quaternion previous_chassis_orientation_{0.0, 0.0, 0.0, 1.0};
+  rclcpp::Time previous_stamp_{0, 0, RCL_ROS_TIME};
+  std::string previous_parent_frame_;
 };
 
 }  // namespace sensor_scan_generation

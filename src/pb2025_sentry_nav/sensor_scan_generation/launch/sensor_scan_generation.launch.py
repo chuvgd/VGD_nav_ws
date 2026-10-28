@@ -16,6 +16,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -23,6 +24,10 @@ def generate_launch_description():
     lidar_frame = LaunchConfiguration("lidar_frame")
     base_frame = LaunchConfiguration("base_frame")
     robot_base_frame = LaunchConfiguration("robot_base_frame")
+    min_dt = LaunchConfiguration("min_dt")
+    max_dt = LaunchConfiguration("max_dt")
+    max_sync_skew = LaunchConfiguration("max_sync_skew")
+    transform_timeout = LaunchConfiguration("transform_timeout")
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
     # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
@@ -54,6 +59,30 @@ def generate_launch_description():
         description="Frame ID for Gimbal",
     )
 
+    declare_min_dt = DeclareLaunchArgument(
+        "min_dt",
+        default_value="0.0001",
+        description="Minimum odometry stamp interval in seconds; closer samples are dropped",
+    )
+
+    declare_max_dt = DeclareLaunchArgument(
+        "max_dt",
+        default_value="0.5",
+        description="Maximum odometry stamp interval in seconds; larger gaps reset velocity history",
+    )
+
+    declare_max_sync_skew = DeclareLaunchArgument(
+        "max_sync_skew",
+        default_value="0.05",
+        description="Maximum paired cloud/odometry stamp difference in seconds",
+    )
+
+    declare_transform_timeout = DeclareLaunchArgument(
+        "transform_timeout",
+        default_value="0.05",
+        description="Wall-clock timeout per TF lookup in seconds; 0 performs an immediate lookup",
+    )
+
     start_sensor_scan_generation = Node(
         package="sensor_scan_generation",
         executable="sensor_scan_generation_node",
@@ -64,6 +93,10 @@ def generate_launch_description():
             {"lidar_frame": lidar_frame},
             {"base_frame": base_frame},
             {"robot_base_frame": robot_base_frame},
+            {"min_dt": ParameterValue(min_dt, value_type=float)},
+            {"max_dt": ParameterValue(max_dt, value_type=float)},
+            {"max_sync_skew": ParameterValue(max_sync_skew, value_type=float)},
+            {"transform_timeout": ParameterValue(transform_timeout, value_type=float)},
         ],
     )
 
@@ -74,6 +107,10 @@ def generate_launch_description():
     ld.add_action(declare_lidar_frame)
     ld.add_action(declare_base_frame)
     ld.add_action(declare_robot_base_frame)
+    ld.add_action(declare_min_dt)
+    ld.add_action(declare_max_dt)
+    ld.add_action(declare_max_sync_skew)
+    ld.add_action(declare_transform_timeout)
     ld.add_action(start_sensor_scan_generation)
 
     return ld

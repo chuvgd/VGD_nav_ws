@@ -96,6 +96,11 @@ sensor_scan_generation:
     lidar_frame: "front_mid360"
     base_frame: "base_footprint"
     robot_base_frame: "gimbal_yaw"
+    # 时间参数单位均为秒；差分使用里程计消息时间戳，速度保持在 odom 坐标系。
+    min_dt: 0.0001                    # 小于此间隔的重复/过密样本丢弃，不更新差分历史
+    max_dt: 0.5                       # 超出此间隔则重建历史，首帧速度为零；低频输入需增大
+    max_sync_skew: 0.05               # 点云与里程计实际配对时间戳允许的最大差值
+    transform_timeout: 0.05           # 每次 TF 查询的墙钟等待上限，0.0 表示立即查询
 
 terrain_analysis:
   ros__parameters:
