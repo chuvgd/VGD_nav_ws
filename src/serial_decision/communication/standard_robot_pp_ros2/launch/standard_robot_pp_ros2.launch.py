@@ -81,7 +81,7 @@ def generate_launch_description():
 
     declare_robot_name_cmd = DeclareLaunchArgument(
         "robot_name",
-        default_value="pb2025_sentry_robot",
+        default_value="VGD2027_sentry_robot",
         description="The file name of the robot xmacro to be used",
     )
 
@@ -110,7 +110,7 @@ def generate_launch_description():
                     os.path.join(
                         pkg_pb2025_robot_description_dir,
                         "launch",
-                        "robot_description_launch.py",
+                        "minimal_tf_launch.py",
                     )
                 ),
                 launch_arguments={

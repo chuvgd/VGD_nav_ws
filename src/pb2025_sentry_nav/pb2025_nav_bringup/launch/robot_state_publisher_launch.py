@@ -14,7 +14,7 @@
 
 
 # NOTE: This startup file is only used when the navigation module is standalone
-# It is used to launch the robot state publisher and joint state publisher.
+# It launches only the minimal body/LiDAR static TF broadcaster.
 # But in a complete robot system, this part should be completed by an independent robot startup module
 
 import os
@@ -52,7 +52,7 @@ def generate_launch_description():
 
     declare_robot_name_cmd = DeclareLaunchArgument(
         "robot_name",
-        default_value="pb2025_sentry_robot",
+        default_value="VGD2027_sentry_robot",
         description="The file name of the robot xmacro to be used",
     )
 
@@ -66,7 +66,7 @@ def generate_launch_description():
                     os.path.join(
                         pkg_pb2025_robot_description_dir,
                         "launch",
-                        "robot_description_launch.py",
+                        "minimal_tf_launch.py",
                     )
                 ),
                 launch_arguments={

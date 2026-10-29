@@ -1,0 +1,6 @@
+/**:
+  ros__parameters:
+    chassis_height: 0.077
+    gimbal_height: 0.026
+    lidar_xyz: [-0.056, -0.213, 0.240]
+    lidar_rpy: [0.7853981633974483, 0.0, 0.0]
