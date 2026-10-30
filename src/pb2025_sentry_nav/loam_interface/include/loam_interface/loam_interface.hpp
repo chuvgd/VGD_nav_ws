@@ -53,6 +53,9 @@ private:
 
   bool base_frame_to_lidar_initialized_;
   tf2::Transform tf_odom_to_lidar_odom_;
+  bool input_pose_is_imu_;
+  // T_IL: LiDAR coordinates -> IMU coordinates, identical to Point-LIO extrinsic_T/R.
+  tf2::Transform tf_imu_to_lidar_{tf2::Transform::getIdentity()};
 };
 
 }  // namespace loam_interface

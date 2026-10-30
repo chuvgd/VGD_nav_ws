@@ -5,4 +5,5 @@ build
 install
 log
 validation
-src/pb2025_sentry_nav/sensor_scan_generation/test
+sensor_scan_generation/test
+docs

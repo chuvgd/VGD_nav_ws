@@ -89,6 +89,11 @@ loam_interface:
     odom_frame: "odom"
     base_frame: "base_footprint"
     lidar_frame: "front_mid360"
+    # LIO pose 为 IMU-body；E 与上方 Point-LIO mapping.extrinsic_T/R 必须完全一致。
+    # 开启仅补偿 IMU/LiDAR 参考体，不执行首帧归零或重力世界对齐。
+    input_pose_is_imu: true
+    lidar_in_imu_translation: [0.0, 0.0, 0.0]
+    lidar_in_imu_rotation: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
 
 sensor_scan_generation:
   ros__parameters:

@@ -14,6 +14,10 @@
 
 #include "loam_interface/loam_interface.hpp"
 
+#include <cmath>
+#include <stdexcept>
+#include <vector>
+
 #include "pcl_ros/transforms.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
@@ -35,6 +39,41 @@ LoamInterfaceNode::LoamInterfaceNode(const rclcpp::NodeOptions & options)
   this->get_parameter("base_frame", base_frame_);
   this->get_parameter("lidar_frame", lidar_frame_);
 
+  input_pose_is_imu_ = this->declare_parameter<bool>("input_pose_is_imu", false);
+  const auto translation = this->declare_parameter<std::vector<double>>(
+    "lidar_in_imu_translation", std::vector<double>{0.0, 0.0, 0.0});
+  const auto rotation = this->declare_parameter<std::vector<double>>(
+    "lidar_in_imu_rotation", std::vector<double>{1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0});
+  if (translation.size() != 3 || rotation.size() != 9) {
+    throw std::invalid_argument("LiDAR-in-IMU translation/rotation must have 3/9 elements");
+  }
+  for (const double value : translation) {
+    if (!std::isfinite(value)) {
+      throw std::invalid_argument("LiDAR-in-IMU translation must be finite");
+    }
+  }
+  for (const double value : rotation) {
+    if (!std::isfinite(value)) {
+      throw std::invalid_argument("LiDAR-in-IMU rotation must be finite");
+    }
+  }
+  const tf2::Matrix3x3 basis(
+    rotation[0], rotation[1], rotation[2], rotation[3], rotation[4], rotation[5], rotation[6],
+    rotation[7], rotation[8]);
+  const auto orthogonality = basis.transpose() * basis;
+  for (int row = 0; row < 3; ++row) {
+    for (int col = 0; col < 3; ++col) {
+      if (std::abs(orthogonality[row][col] - (row == col ? 1.0 : 0.0)) > 1e-6) {
+        throw std::invalid_argument("LiDAR-in-IMU rotation must be orthonormal");
+      }
+    }
+  }
+  if (std::abs(basis.determinant() - 1.0) > 1e-6) {
+    throw std::invalid_argument("LiDAR-in-IMU rotation must have determinant +1");
+  }
+  tf_imu_to_lidar_.setBasis(basis);
+  tf_imu_to_lidar_.setOrigin(tf2::Vector3(translation[0], translation[1], translation[2]));
+
   base_frame_to_lidar_initialized_ = false;
 
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -55,7 +94,7 @@ void LoamInterfaceNode::pointCloudCallback(const sensor_msgs::msg::PointCloud2::
 {
   // NOTE: Input point cloud message is based on the `lidar_odom`
   // Here we transform it to the REAL `odom` frame
-  if(!base_frame_to_lidar_initialized_){
+  if (!base_frame_to_lidar_initialized_) {
     return;
   }
   auto out = std::make_shared<sensor_msgs::msg::PointCloud2>();
@@ -74,6 +113,11 @@ void LoamInterfaceNode::odometryCallback(const nav_msgs::msg::Odometry::ConstSha
       tf2::Transform tf_base_frame_to_lidar;
       tf2::fromMsg(tf_stamped.transform, tf_base_frame_to_lidar);
       tf_odom_to_lidar_odom_ = tf_base_frame_to_lidar;
+      if (input_pose_is_imu_) {
+        // A = C * inverse(E). Use the same world alignment for pose and registered points.
+        // Keep the existing initial-world convention: no first-pose/gravity normalization here.
+        tf_odom_to_lidar_odom_ *= tf_imu_to_lidar_.inverse();
+      }
       base_frame_to_lidar_initialized_ = true;
     } catch (tf2::TransformException & ex) {
       RCLCPP_WARN(this->get_logger(), "TF lookup failed: %s Retrying...", ex.what());
@@ -85,6 +129,11 @@ void LoamInterfaceNode::odometryCallback(const nav_msgs::msg::Odometry::ConstSha
   tf2::Transform tf_lidar_odom_to_lidar;
   tf2::fromMsg(msg->pose.pose, tf_lidar_odom_to_lidar);
   tf2::Transform tf_odom_to_lidar = tf_odom_to_lidar_odom_ * tf_lidar_odom_to_lidar;
+  if (input_pose_is_imu_) {
+    // The LIO state is T_WI; right-multiplying E makes the output a LiDAR pose T_OL.
+    // Combined with A above: T_OL = C * inverse(E) * T_WI * E.
+    tf_odom_to_lidar *= tf_imu_to_lidar_;
+  }
 
   nav_msgs::msg::Odometry out;
   out.header.stamp = msg->header.stamp;

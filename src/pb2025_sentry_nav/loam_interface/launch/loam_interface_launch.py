@@ -17,6 +17,7 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -33,6 +34,16 @@ def generate_launch_description():
     declare_namespace = DeclareLaunchArgument(
         "namespace", default_value="", description="Namespace for the node"
     )
+    declare_input_pose_is_imu = DeclareLaunchArgument(
+        "input_pose_is_imu", default_value="true"
+    )
+    declare_lidar_translation = DeclareLaunchArgument(
+        "lidar_in_imu_translation", default_value="[-0.011, -0.02329, 0.04412]"
+    )
+    declare_lidar_rotation = DeclareLaunchArgument(
+        "lidar_in_imu_rotation",
+        default_value="[1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]",
+    )
 
     start_loam_interface = Node(
         package="loam_interface",
@@ -48,6 +59,13 @@ def generate_launch_description():
                 "odom_frame": "odom",
                 "base_frame": "gimbal_yaw",
                 "lidar_frame": "front_mid360",
+                "input_pose_is_imu": ParameterValue(
+                    LaunchConfiguration("input_pose_is_imu"), value_type=bool
+                ),
+                "lidar_in_imu_translation": LaunchConfiguration(
+                    "lidar_in_imu_translation"
+                ),
+                "lidar_in_imu_rotation": LaunchConfiguration("lidar_in_imu_rotation"),
             }
         ],
     )
@@ -56,6 +74,9 @@ def generate_launch_description():
 
     # Add the actions
     ld.add_action(declare_namespace)
+    ld.add_action(declare_input_pose_is_imu)
+    ld.add_action(declare_lidar_translation)
+    ld.add_action(declare_lidar_rotation)
     ld.add_action(start_loam_interface)
 
     return ld

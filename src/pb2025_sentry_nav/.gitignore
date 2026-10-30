@@ -21,3 +21,9 @@ __pycache__
 
 pb2025_nav_bringup/map/reality/*.yaml
 pb2025_nav_bringup/map/reality/*.pgm
+
+/sensor_scan_generation/test
+
+/loam_interface/test
+
+/loam_interface/README.md
