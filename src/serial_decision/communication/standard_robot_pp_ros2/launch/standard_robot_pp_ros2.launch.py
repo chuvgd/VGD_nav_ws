@@ -22,6 +22,7 @@ from launch.actions import (
     IncludeLaunchDescription,
     SetEnvironmentVariable,
 )
+from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node, PushRosNamespace, SetRemap
@@ -99,6 +100,12 @@ def generate_launch_description():
         "log_level", default_value="info", description="log level"
     )
 
+    declare_publish_body_tf_cmd = DeclareLaunchArgument(
+        "publish_body_tf",
+        default_value="True",
+        description="Publish body static TF when serial bringup runs standalone",
+    )
+
     # Specify the actions
     bringup_cmd_group = GroupAction(
         [
@@ -113,6 +120,7 @@ def generate_launch_description():
                         "minimal_tf_launch.py",
                     )
                 ),
+                condition=IfCondition(LaunchConfiguration("publish_body_tf")),
                 launch_arguments={
                     "params_file": params_file,
                     "robot_name": robot_name,
@@ -153,6 +161,7 @@ def generate_launch_description():
     ld.add_action(declare_namespace_cmd)
     ld.add_action(declare_params_file_cmd)
     ld.add_action(declare_robot_name_cmd)
+    ld.add_action(declare_publish_body_tf_cmd)
     ld.add_action(declare_use_rviz_cmd)
     ld.add_action(declare_use_respawn_cmd)
     ld.add_action(declare_log_level_cmd)

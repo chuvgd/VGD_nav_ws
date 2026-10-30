@@ -18,12 +18,13 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
+    GroupAction,
     IncludeLaunchDescription,
     SetEnvironmentVariable,
 )
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PythonExpression, TextSubstitution
+from launch.substitutions import LaunchConfiguration, TextSubstitution
 from launch_ros.actions import Node
 from launch_ros.descriptions import ParameterFile
 from nav2_common.launch import RewrittenYaml
@@ -33,6 +34,7 @@ def generate_launch_description():
     # Get the launch directory
     bringup_dir = get_package_share_directory("pb2025_sentry_bringup")
 
+    robot_description_dir = get_package_share_directory("pb2025_robot_description")
     serial_bringup_dir = get_package_share_directory("standard_robot_pp_ros2")
     # vision_bringup_dir = get_package_share_directory("pb2025_vision_bringup")
     navigation_bringup_dir = get_package_share_directory("pb2025_nav_bringup")
@@ -79,7 +81,7 @@ def generate_launch_description():
     declare_robot_name_cmd = DeclareLaunchArgument(
         "robot_name",
         default_value="VGD2027_sentry_robot",
-        description="The file name of the robot xmacro to be used",
+        description="Robot profile used for the minimal body static TF",
     )
 
     # declare_detector_cmd = DeclareLaunchArgument(
@@ -151,7 +153,7 @@ def generate_launch_description():
     declare_use_robot_state_pub_cmd = DeclareLaunchArgument(
         "use_robot_state_pub",
         default_value="False",
-        description="Whether to start the robot state publisher",
+        description="Legacy option: start serial driver and gimbal manager; body static TF is always started",
     )
 
     declare_use_rviz_cmd = DeclareLaunchArgument(
@@ -174,6 +176,18 @@ def generate_launch_description():
         "log_level", default_value="info", description="log level"
     )
 
+    # The complete bringup owns one body TF publisher, independently of serial hardware.
+    start_body_tf_cmd = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(robot_description_dir, "launch", "minimal_tf_launch.py")
+        ),
+        launch_arguments={
+            "namespace": namespace,
+            "use_sim_time": use_sim_time,
+            "robot_name": robot_name,
+        }.items(),
+    )
+
     # Specify the actions
     start_serial_driver_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -181,9 +195,10 @@ def generate_launch_description():
                 serial_bringup_dir, "launch", "standard_robot_pp_ros2.launch.py"
             )
         ),
-        condition=IfCondition(PythonExpression([use_robot_state_pub])),
+        condition=IfCondition(use_robot_state_pub),
         launch_arguments={
             "robot_name": robot_name,
+            "publish_body_tf": "False",
             "namespace": namespace,
             "params_file": params_file,
             "use_rviz": "False",
@@ -291,10 +306,12 @@ def generate_launch_description():
     ld.add_action(declare_log_level_cmd)
 
     # Add the actions to launch all of the navigation nodes
-    ld.add_action(start_rviz_cmd)
-    ld.add_action(start_serial_driver_cmd)
+    # Scope child arguments (e.g. use_rviz=False) so they cannot overwrite sibling options.
+    ld.add_action(GroupAction([start_body_tf_cmd]))
+    ld.add_action(GroupAction([start_rviz_cmd]))
+    ld.add_action(GroupAction([start_serial_driver_cmd]))
     # ld.add_action(start_vision_launch_cmd)
-    ld.add_action(start_navigation_launch_cmd)
+    ld.add_action(GroupAction([start_navigation_launch_cmd]))
     # ld.add_action(start_behavior_launch_cmd)
     # ld.add_action(record_rosbag_cmd)
 

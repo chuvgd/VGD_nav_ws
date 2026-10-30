@@ -13,6 +13,7 @@
   <exec_depend>standard_robot_pp_ros2</exec_depend>
   <!-- <exec_depend>pb2025_vision_bringup</exec_depend> -->
   <exec_depend>pb2025_nav_bringup</exec_depend>
+  <exec_depend>pb2025_robot_description</exec_depend>
   <exec_depend>pb2025_sentry_behavior</exec_depend>
   <exec_depend>ros2bag</exec_depend>
   <exec_depend>rosbag2_transport</exec_depend>

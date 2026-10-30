@@ -22,6 +22,7 @@ from launch.event_handlers import OnProcessExit
 from launch.events import Shutdown
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 
 
 def generate_launch_description():
@@ -56,6 +57,13 @@ def generate_launch_description():
         executable="rviz2",
         namespace=namespace,
         arguments=["-d", rviz_config_file],
+        parameters=[
+            {
+                "use_sim_time": ParameterValue(
+                    LaunchConfiguration("use_sim_time"), value_type=bool
+                )
+            }
+        ],
         output="screen",
         remappings=[
             ("/tf", "tf"),
@@ -79,6 +87,7 @@ def generate_launch_description():
 
     # Declare the launch options
     ld.add_action(declare_namespace_cmd)
+    ld.add_action(DeclareLaunchArgument("use_sim_time", default_value="False"))
     ld.add_action(declare_rviz_config_file_cmd)
 
     # Add any conditioned actions
