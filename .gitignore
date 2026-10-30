@@ -7,3 +7,4 @@ log
 validation
 sensor_scan_generation/test
 docs
+rosbags
