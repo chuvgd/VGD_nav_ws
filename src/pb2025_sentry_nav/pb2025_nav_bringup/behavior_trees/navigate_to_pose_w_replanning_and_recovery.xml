@@ -8,7 +8,7 @@
         <RateController hz="3.0">
           <RecoveryNode name="ComputePathToPose"
                         number_of_retries="1">
-            <Sequence name="ComputePathToPose">
+            <Sequence>
                 <ComputePathToPose goal="{goal}" path="{path}" planner_id="GridBased"/>
                 <!-- <SmoothPath unsmoothed_path="{path}" smoothed_path="{path}"/> -->
                 <SmoothPath unsmoothed_path="{path}" smoothed_path="{smoothed_path}"/>
@@ -35,8 +35,8 @@
             <ClearEntireCostmap name="ClearGlobalCostmap-Subtree"
                                 service_name="global_costmap/clear_entirely_global_costmap"/>
           </Sequence>
-          <!--<BackUp backup_dist="1.0"
-                  backup_speed="1.0"/>-->
+          <BackUp backup_dist="1.0"
+                  backup_speed="1.0"/>
         </RoundRobin>
       </ReactiveFallback>
     </RecoveryNode>

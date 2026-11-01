@@ -1,17 +1,3 @@
-// Copyright 2025 SMBU-PolarBear-Robotics-Team
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 //完整流程：三个阻塞多线程：（1）保护串口线程；（2）发送数据线程；（3）收到数据线程
 //收发逻辑：收数据——从下位机收取到字节流（std::vector<uint8_t>的字节数组）然后转成ros2自定义消息类型的消息去发布话题
 //发数据：一样是订阅话题然后把ros2自定义消息类型的消息去转成结构体,将结构体数据再变成字节数组进行发送给下位机
@@ -46,13 +32,6 @@ StandardRobotPpRos2Node::StandardRobotPpRos2Node(const rclcpp::NodeOptions & opt
   getParams();
   createPublisher();
   createSubscription();
-
-  robot_models_.chassis = {
-    {0, "无底盘"}, {1, "麦轮底盘"}, {2, "全向轮底盘"}, {3, "舵轮底盘"}, {4, "平衡底盘"}};
-  robot_models_.gimbal = {{0, "无云台"}, {1, "yaw_pitch直连云台"}};
-  robot_models_.shoot = {{0, "无发射机构"}, {1, "摩擦轮+拨弹盘"}, {2, "气动+拨弹盘"}};
-  robot_models_.arm = {{0, "无机械臂"}, {1, "mini机械臂"}};
-  robot_models_.custom_controller = {{0, "无自定义控制器"}, {1, "mini自定义控制器"}};//一样是串口去确定机器人类型和一些参数
   
   serial_port_protect_thread_ = std::thread(&StandardRobotPpRos2Node::serialPortProtect, this);
   receive_thread_ = std::thread(&StandardRobotPpRos2Node::receiveData, this);
@@ -84,7 +63,6 @@ StandardRobotPpRos2Node::~StandardRobotPpRos2Node()
 
 void StandardRobotPpRos2Node::createPublisher()
 {
-  imu_pub_ = this->create_publisher<sensor_msgs::msg::Imu>("serial/imu", 10);//利用这个节点的对象的模板成员函数（创建发布者函数）去发布一个话题，传入参数是话题名称和qos队列服务质量，返回的是指向这个模板成员函数类型的发布者对象的共享指针
   robot_state_info_pub_ =
     this->create_publisher<pb_rm_interfaces::msg::RobotStateInfo>("serial/robot_state_info", 10);
   joint_state_pub_ =
@@ -501,57 +479,6 @@ void StandardRobotPpRos2Node::publishDebugData(ReceiveDebugData & received_debug
   }
 }
 
-void StandardRobotPpRos2Node::publishImuData(ReceiveImuData & imu_data)
-{
-  sensor_msgs::msg::JointState joint_msg;
-  sensor_msgs::msg::Imu imu_msg;
-  imu_msg.header.stamp = joint_msg.header.stamp = now();
-  imu_msg.header.frame_id = "gimbal_pitch_odom";
-
-  // Convert Euler angles to quaternion
-  tf2::Quaternion q;
-  q.setRPY(imu_data.data.roll, imu_data.data.pitch, imu_data.data.yaw);//setRPY是tf2::Quaternion的成员函数，是把欧拉角转成四元数存入q这个对象中
-  imu_msg.orientation = tf2::toMsg(q);//转成geometry_msgs/Quaternion orientation这个ros2的消息类型
-  //四元数表示整个车的姿态
-  imu_msg.angular_velocity.x = imu_data.data.roll_vel;
-  imu_msg.angular_velocity.y = imu_data.data.pitch_vel;
-  imu_msg.angular_velocity.z = imu_data.data.yaw_vel;
-  //刚体三个轴的角速度
-  imu_pub_->publish(imu_msg);//imu_pub_是<sensor_msgs::msg::Imu>类型类的共享指针对象，用这个实例化对象去调用成员函数去发布消息
-  //这个只是纯发布imu的相关数据
-
-  joint_msg.name = {
-    "gimbal_pitch_joint",
-    "gimbal_yaw_joint",
-    "gimbal_pitch_odom_joint",
-    "gimbal_yaw_odom_joint",
-  };
-  joint_msg.position = {
-    imu_data.data.pitch,
-    imu_data.data.yaw,
-    last_gimbal_pitch_odom_joint_,
-    last_gimbal_yaw_odom_joint_,
-  };
-  joint_state_pub_->publish(joint_msg);//这个主要是参与tf树的构建
-}
-
-void StandardRobotPpRos2Node::publishRobotInfo(ReceiveRobotInfoData & robot_info)
-{
-  pb_rm_interfaces::msg::RobotStateInfo msg;
-
-  msg.header.stamp.sec = robot_info.time_stamp / 1000;
-  msg.header.stamp.nanosec = (robot_info.time_stamp % 1000) * 1e6;
-  msg.header.frame_id = "odom";
-
-  msg.models.chassis = robot_models_.chassis.at(robot_info.data.type.chassis);
-  msg.models.gimbal = robot_models_.gimbal.at(robot_info.data.type.gimbal);
-  msg.models.shoot = robot_models_.shoot.at(robot_info.data.type.shoot);
-  msg.models.arm = robot_models_.arm.at(robot_info.data.type.arm);
-  msg.models.custom_controller =
-    robot_models_.custom_controller.at(robot_info.data.type.custom_controller);
-
-  robot_state_info_pub_->publish(msg);
-}
 
 void StandardRobotPpRos2Node::publishEventData(ReceiveEventData & event_data)
 {
@@ -632,37 +559,6 @@ void StandardRobotPpRos2Node::publishGameStatus(ReceiveGameStatusData & game_sta
       RCLCPP_ERROR(get_logger(), "Failed to call service: %s", service_name.c_str());
     }
   }
-}
-
-void StandardRobotPpRos2Node::publishRobotMotion(ReceiveRobotMotionData & robot_motion)
-{
-  geometry_msgs::msg::Twist msg;
-
-  msg.linear.x = robot_motion.data.speed_vector.vx;
-  msg.linear.y = robot_motion.data.speed_vector.vy;
-  msg.angular.z = robot_motion.data.speed_vector.wz;
-
-  robot_motion_pub_->publish(msg);
-}
-
-void StandardRobotPpRos2Node::publishGroundRobotPosition(
-  ReceiveGroundRobotPosition & ground_robot_position)
-{
-  pb_rm_interfaces::msg::GroundRobotPosition msg;
-
-  msg.hero_position.x = ground_robot_position.data.hero_x;
-  msg.hero_position.y = ground_robot_position.data.hero_y;
-
-  msg.engineer_position.x = ground_robot_position.data.engineer_x;
-  msg.engineer_position.y = ground_robot_position.data.engineer_y;
-
-  msg.standard_3_position.x = ground_robot_position.data.standard_3_x;
-  msg.standard_3_position.y = ground_robot_position.data.standard_3_y;
-
-  msg.standard_4_position.x = ground_robot_position.data.standard_4_x;
-  msg.standard_4_position.y = ground_robot_position.data.standard_4_y;
-
-  ground_robot_position_pub_->publish(msg);
 }
 
 void StandardRobotPpRos2Node::publishRfidStatus(ReceiveRfidStatus & rfid_status)
@@ -748,24 +644,6 @@ void StandardRobotPpRos2Node::publishRobotStatus(ReceiveRobotStatus & robot_stat
   }
 }
 
-void StandardRobotPpRos2Node::publishJointState(ReceiveJointState & packet)
-{
-  last_gimbal_pitch_odom_joint_ = packet.data.pitch;
-  last_gimbal_yaw_odom_joint_ = packet.data.yaw;
-}
-
-void StandardRobotPpRos2Node::publishBuff(ReceiveBuff & buff)
-{
-  pb_rm_interfaces::msg::Buff msg;
-  msg.recovery_buff = buff.data.recovery_buff;
-  msg.cooling_buff = buff.data.cooling_buff;
-  msg.defence_buff = buff.data.defence_buff;
-  msg.vulnerability_buff = buff.data.vulnerability_buff;
-  msg.attack_buff = buff.data.attack_buff;
-  msg.remaining_energy = buff.data.remaining_energy;
-  buff_pub_->publish(msg);
-}
-
 /********************************************************/
 /* Send data                                            */
 /********************************************************/
@@ -807,7 +685,7 @@ void StandardRobotPpRos2Node::sendData()
   }
 }
 
-// 👇 新增：姿态回调函数
+
 void StandardRobotPpRos2Node::cmdPostureCallback(const pb_rm_interfaces::msg::SentryPosture::SharedPtr msg) {
     send_robot_cmd_data_.data.sentry_info.robot_posture = msg->current_posture;
 }
