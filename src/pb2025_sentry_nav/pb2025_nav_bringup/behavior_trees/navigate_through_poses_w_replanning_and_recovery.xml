@@ -11,7 +11,8 @@
             <ReactiveSequence>
               <RemovePassedGoals input_goals="{goals}"
                                  output_goals="{goals}"
-                                 radius="0.7"/>
+                                 radius="0.7"
+                                 robot_base_frame="gimbal_yaw_fake"/>
               <Sequence>
                 <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased"/>
                 <SmoothPath unsmoothed_path="{path}" smoothed_path="{smoothed_path}"/>
