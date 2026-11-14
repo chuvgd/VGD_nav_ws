@@ -139,15 +139,6 @@ def generate_launch_description():
                 parameters=[configured_params],
                 arguments=["--ros-args", "--log-level", log_level],
             ),
-            Node(
-                package="standard_robot_pp_ros2",
-                executable="gimbal_manager_node",
-                name="gimbal_manager",
-                output="screen",
-                respawn=use_respawn,
-                respawn_delay=2.0,
-                arguments=["--ros-args", "--log-level", log_level],
-            ),
         ]
     )
     # Create the launch description and populate

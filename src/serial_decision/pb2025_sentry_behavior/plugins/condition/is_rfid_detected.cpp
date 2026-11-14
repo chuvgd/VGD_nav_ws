@@ -25,29 +25,16 @@ IsRfidDetectedCondition::IsRfidDetectedCondition(
 
 BT::NodeStatus IsRfidDetectedCondition::checkRfidStatus()
 {
-  bool friendly_fortress_gain_point, friendly_supply_zone_non_exchange,
-    friendly_supply_zone_exchange, center_gain_point;
   auto msg = getInput<pb_rm_interfaces::msg::RfidStatus>("key_port");
   if (!msg) {
-    return BT::NodeStatus::FAILURE;
     RCLCPP_ERROR(logger_, "RfidStatus message is not available");
-  }
-
-  getInput("friendly_fortress_gain_point", friendly_fortress_gain_point);
-  getInput("friendly_supply_zone_non_exchange", friendly_supply_zone_non_exchange);
-  getInput("friendly_supply_zone_exchange", friendly_supply_zone_exchange);
-  getInput("center_gain_point", center_gain_point);
-
-  if (
-    (friendly_fortress_gain_point && msg->friendly_fortress_gain_point == msg->DETECTED) ||
-    (friendly_supply_zone_non_exchange &&
-     msg->friendly_supply_zone_non_exchange == msg->DETECTED) ||
-    (friendly_supply_zone_exchange && msg->friendly_supply_zone_exchange == msg->DETECTED) ||
-    (center_gain_point && msg->center_gain_point == msg->DETECTED)) {
-    return BT::NodeStatus::SUCCESS;
-  } else {
     return BT::NodeStatus::FAILURE;
   }
+
+  bool ally_supply_point = false;
+  getInput("ally_supply_point", ally_supply_point);
+  return ally_supply_point && msg->ally_supply_point ? BT::NodeStatus::SUCCESS :
+                                                       BT::NodeStatus::FAILURE;
 }
 
 BT::PortsList IsRfidDetectedCondition::providedPorts()
@@ -55,11 +42,7 @@ BT::PortsList IsRfidDetectedCondition::providedPorts()
   return {
     BT::InputPort<pb_rm_interfaces::msg::RfidStatus>(
       "key_port", "{@referee_rfidStatus}", "RfidStatus port on blackboard"),
-    BT::InputPort<bool>("friendly_fortress_gain_point", false, "己方堡垒增益点"),
-    BT::InputPort<bool>(
-      "friendly_supply_zone_non_exchange", false, "己方与兑换区不重叠的补给区 / RMUL 补给区"),
-    BT::InputPort<bool>("friendly_supply_zone_exchange", false, "己方与兑换区重叠的补给区"),
-    BT::InputPort<bool>("center_gain_point", false, "中心增益点（仅 RMUL 适用）"),
+    BT::InputPort<bool>("ally_supply_point", true, "己方补给点"),
   };
 }
 }  // namespace pb2025_sentry_behavior

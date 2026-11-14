@@ -1,6 +1,7 @@
+#include "pb2025_sentry_behavior/tools/custom_types.hpp"
 #include "pb2025_sentry_behavior/plugins/action/load_waypoints.hpp"
 
-#include "pb2025_sentry_behavior/waypoint_loader.hpp"
+#include "pb2025_sentry_behavior/tools/waypoint_loader.hpp"
 
 namespace pb2025_sentry_behavior
 {

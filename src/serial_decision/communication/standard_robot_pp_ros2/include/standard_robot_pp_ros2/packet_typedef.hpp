@@ -1,22 +1,9 @@
-// Copyright 2025 SMBU-PolarBear-Robotics-Team
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 #ifndef STANDARD_ROBOT_PP_ROS2__PACKET_TYPEDEF_HPP_
 #define STANDARD_ROBOT_PP_ROS2__PACKET_TYPEDEF_HPP_
 
 #include <algorithm>
 #include <cstdint>
+#include <stdexcept>
 #include <vector>
 
 namespace standard_robot_pp_ros2
@@ -25,19 +12,11 @@ const uint8_t SOF_RECEIVE = 0x5A;
 const uint8_t SOF_SEND = 0x5A;
 
 // Receive
-const uint8_t ID_DEBUG = 0x01;
-const uint8_t ID_IMU = 0x02;
-const uint8_t ID_ROBOT_STATE_INFO = 0x03;
 const uint8_t ID_EVENT_DATA = 0x04;
-const uint8_t ID_PID_DEBUG = 0x05;
 const uint8_t ID_ALL_ROBOT_HP = 0x06;
 const uint8_t ID_GAME_STATUS = 0x07;
-const uint8_t ID_ROBOT_MOTION = 0x08;
-const uint8_t ID_GROUND_ROBOT_POSITION = 0x09;
 const uint8_t ID_RFID_STATUS = 0x0A;
 const uint8_t ID_ROBOT_STATUS = 0x0B;
-const uint8_t ID_JOINT_STATE = 0x0C;
-const uint8_t ID_BUFF = 0x0D;
 // Send
 // 在 packet_typedef.hpp 的 "Send" 注释区域添加
 const uint8_t ID_ROBOT_CMD = 0x01;
@@ -61,6 +40,7 @@ struct HeaderFrame
 struct ReceiveEventData
 {
   HeaderFrame frame_header;
+  
   uint32_t time_stamp;
 
   struct
@@ -84,33 +64,22 @@ struct ReceiveEventData
 struct ReceiveAllRobotHpData
 {
   HeaderFrame frame_header;
+  
   uint32_t time_stamp;
 
   struct
   {
-    // uint16_t red_1_robot_hp;
-    // uint16_t red_2_robot_hp;
-    // uint16_t red_3_robot_hp;
-    // uint16_t red_4_robot_hp;
-    // uint16_t red_7_robot_hp;
-    // uint16_t red_outpost_hp;
-    // uint16_t red_base_hp;
-
-    // uint16_t blue_1_robot_hp;
-    // uint16_t blue_2_robot_hp;
-    // uint16_t blue_3_robot_hp;
-    // uint16_t blue_4_robot_hp;
-    // uint16_t blue_7_robot_hp;
-    // uint16_t blue_outpost_hp;
-    // uint16_t blue_base_hp;
     uint16_t ally_1_robot_HP;
-    uint16_t ally_2_robot_HP;
     uint16_t ally_3_robot_HP;
     uint16_t ally_4_robot_HP;
     int16_t damage_difference;
     uint16_t ally_7_robot_HP;
-    uint16_t ally_outpost_HP;
+    uint16_t outpost_R_HP;
+    uint16_t outpost_B_HP;
     uint16_t ally_base_HP;
+    uint16_t enemy_base_HP;
+    uint16_t ally_control_degree;
+    uint16_t enemy_control_degree;
   } __attribute__((packed)) data;
 
   uint16_t crc;
@@ -150,7 +119,7 @@ struct ReceiveRfidStatus
 struct ReceiveRobotStatus
 {
   HeaderFrame frame_header;
-
+  
   uint32_t time_stamp;
 
   struct
@@ -164,22 +133,6 @@ struct ReceiveRobotStatus
     uint8_t powerful_offensive_posture;
     uint8_t powerful_defensive_posture;
     uint8_t powerful_movement_posture;
-  } __attribute__((packed)) data;
-  uint16_t crc;
-} __attribute__((packed));
-
-// 建筑物血量数据包
-struct ReceiveBuildingStatus
-{
-  HeaderFrame frame_header;
-
-  uint32_t time_stamp;
-
-  struct{
-    uint16_t outpost_R_HP;
-    uint16_t ally_base_HP;
-    uint16_t outpost_B_HP;
-    uint16_t enemy_base_HP;
   } __attribute__((packed)) data;
   uint16_t crc;
 } __attribute__((packed));
@@ -219,6 +172,10 @@ struct SendRobotCmdData
 template <typename T>
 inline T fromVector(const std::vector<uint8_t> & data)
 {
+  if (data.size() != sizeof(T)) {
+    throw std::invalid_argument("packet size does not match structure size");
+  }
+
   T packet;
   std::copy(data.begin(), data.end(), reinterpret_cast<uint8_t *>(&packet));
   return packet;

@@ -22,6 +22,7 @@
 #include "behaviortree_cpp/action_node.h"
 #include "behaviortree_cpp/bt_factory.h"
 #include "rclcpp_action/rclcpp_action.hpp"
+#include "rclcpp_action/exceptions.hpp"
 
 #include "behaviortree_ros2/ros_node_params.hpp"
 
@@ -546,8 +547,10 @@ inline void RosActionNode<T>::cancelGoal()
 
   auto& action_client = client_instance_->action_client;
 
-  auto future_result = action_client->async_get_result(goal_handle_);
-  auto future_cancel = action_client->async_cancel_goal(goal_handle_);
+  try
+  {
+    auto future_result = action_client->async_get_result(goal_handle_);
+    auto future_cancel = action_client->async_cancel_goal(goal_handle_);
 
   constexpr auto SUCCESS = rclcpp::FutureReturnCode::SUCCESS;
 
@@ -558,9 +561,14 @@ inline void RosActionNode<T>::cancelGoal()
   }
 
   if(executor.spin_until_future_complete(future_result, server_timeout_) != SUCCESS)
+    {
+      RCLCPP_ERROR(logger(), "Failed to get result call failed :( for [%s]",
+                   action_name_.c_str());
+    }
+  }catch(const rclcpp_action::exceptions::UnknownGoalHandleError& e)
   {
-    RCLCPP_ERROR(logger(), "Failed to get result call failed :( for [%s]",
-                 action_name_.c_str());
+    RCLCPP_DEBUG(logger(), "Goal already terminal at cancel time for [%s]: %s",
+                 action_name_.c_str(), e.what());
   }
 }
 

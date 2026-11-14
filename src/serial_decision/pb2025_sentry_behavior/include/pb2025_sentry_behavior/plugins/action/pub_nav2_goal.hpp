@@ -31,6 +31,7 @@ public:
   static BT::PortsList providedPorts();//静态方法：定义端口
 
   bool setMessage(geometry_msgs::msg::PoseStamped & goal) override;//作用：当行为树执行到这个节点时，基类会调用这个函数，让你把具体的坐标数据填入 goal 消息中
+  bool shouldPublish(const geometry_msgs::msg::PoseStamped & goal) override;
   // 工作流程：
   //   节点从行为树的输入端口（InputPort）读取坐标字符串（比如 "4.65;-3.5;0"）--输入端口：节点读取参数（xml/黑板->节点）；--输出端口：节点输出数据（节点->黑板）
   //   解析这个字符串，提取出 x, y 和 yaw（偏航角）
@@ -40,6 +41,7 @@ public:
 private:
   rclcpp::Logger logger() { return node_->get_logger(); }
   rclcpp::Time now() { return node_->now(); }
+  bool publish_if_changed_{false};
 };
 }  // namespace pb2025_sentry_behavior
 

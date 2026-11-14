@@ -84,6 +84,9 @@ public:
    */
   virtual bool setMessage(TopicT& msg) = 0;
 
+  // Override when a condition should publish only on meaningful message changes.
+  virtual bool shouldPublish(const TopicT&) { return true; }
+
 protected:
   std::shared_ptr<rclcpp::Node> node_;
   std::string prev_topic_name_;
@@ -184,7 +187,9 @@ inline NodeStatus RosTopicPubNode<T>::tick()
   {
     return NodeStatus::FAILURE;
   }
-  publisher_->publish(msg);
+  if (shouldPublish(msg)) {
+    publisher_->publish(msg);
+  }
   return NodeStatus::SUCCESS;
 }
 

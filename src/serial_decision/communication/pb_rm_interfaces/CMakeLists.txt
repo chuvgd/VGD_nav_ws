@@ -12,20 +12,13 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(geometry_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/referee/Buff.msg"
   "msg/referee/EventData.msg"
   "msg/referee/GameRobotHP.msg"
   "msg/referee/GameStatus.msg"
-  "msg/referee/GroundRobotPosition.msg"
   "msg/referee/RfidStatus.msg"
   "msg/referee/RobotStatus.msg"
 
-  "msg/Gimbal.msg"
-  "msg/GimbalCmd.msg"
-  "msg/Models.msg"
-  "msg/RobotStateInfo.msg"
   "msg/SentryPosture.msg"
-  "msg/SwitchFlag.msg"
 
   DEPENDENCIES
     geometry_msgs

@@ -1,17 +1,23 @@
+#include "pb2025_sentry_behavior/tools/custom_types.hpp"
 #include "pb2025_sentry_behavior/plugins/action/wait_until_reached.hpp"
+#include "pb2025_sentry_behavior/tools/navigation_goal_state.hpp"
 
 #include <cmath>
+#include <stdexcept>
 
 namespace pb2025_sentry_behavior
 {
 
-WaitUntilReached::WaitUntilReached(const std::string & name, const BT::NodeConfig & config)
-: BT::StatefulActionNode(name, config), tolerance_(0.5)
+WaitUntilReached::WaitUntilReached(
+  const std::string & name, const BT::NodeConfig & config, const BT::RosNodeParams & params)
+: BT::StatefulActionNode(name, config), node_(params.nh.lock()), tolerance_(0.5)
 {
-  // 创建内部 ROS 节点用于 TF2 查询
-  node_ = rclcpp::Node::make_shared("wait_until_reached_node");
+  if (!node_) {
+    throw std::runtime_error("ROS node is not available");
+  }
+
   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(node_->get_clock());
-  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_, node_);
+  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_, node_, false);
 }
 
 BT::NodeStatus WaitUntilReached::onStart()
@@ -54,6 +60,7 @@ BT::NodeStatus WaitUntilReached::onRunning()
   double distance = std::sqrt(dx * dx + dy * dy);
 
   if (distance < tolerance_) {
+    clearPublishedNavigationGoal(*config().blackboard);
     RCLCPP_INFO(
       node_->get_logger(), "WaitUntilReached: 已到达目标点 (距离=%.2f)", distance);
     return BT::NodeStatus::SUCCESS;
@@ -63,6 +70,7 @@ BT::NodeStatus WaitUntilReached::onRunning()
 
 void WaitUntilReached::onHalted()
 {
+  clearPublishedNavigationGoal(*config().blackboard);
   RCLCPP_WARN(node_->get_logger(), "WaitUntilReached: 被中断");
 }
 
@@ -77,8 +85,5 @@ BT::PortsList WaitUntilReached::providedPorts()
 
 }  // namespace pb2025_sentry_behavior
 
-#include "behaviortree_cpp/bt_factory.h"
-BT_REGISTER_NODES(factory)
-{
-  factory.registerNodeType<pb2025_sentry_behavior::WaitUntilReached>("WaitUntilReached");
-}
+#include "behaviortree_ros2/plugins.hpp"
+CreateRosNodePlugin(pb2025_sentry_behavior::WaitUntilReached, "WaitUntilReached");

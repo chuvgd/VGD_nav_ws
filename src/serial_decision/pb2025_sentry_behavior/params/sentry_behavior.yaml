@@ -6,6 +6,13 @@ pb2025_sentry_behavior_server:
     groot2_port: 1667                           # Optional (defaults to 1667)
     ros_plugins_timeout: 1000                   # Optional (defaults 1000 ms)
     use_cout_logger: false                      # Optional (defaults to false)
+    entry_goal: ""
+    patrol_waypoint_file: ""
+    home_goal: ""
+    semantic_map_file: "$(find-pkg-share pb2025_sentry_behavior)/semanticregions/VGD.yaml"
+    allowed_regions: [pursuit1]
+    semantic_robot_frame: chassis
+    semantic_enabled: true
 
     plugins:
       - pb2025_sentry_behavior/bt_plugins
@@ -14,11 +21,12 @@ pb2025_sentry_behavior_server:
       - pb2025_sentry_behavior/behavior_trees
 
     CalculateAttackPose:
-      attack_radius: 2.0                        # 攻击半径（米）
+      attack_radius: 1.5                        # 攻击半径（米）
       num_sectors: 36                           # 扇区划分数量
       cost_threshold: 50                        # 栅格的占用概率，大于该值将被视为障碍物 [0, 100]
       robot_base_frame: chassis                 # 取机器人自身位姿用的帧
       gimbal_frame: gimbal_yaw                  # 视觉 (x,y) 所在坐标系（云台 yaw 帧，注意不是 gimbal_yaw_fake）
+      semantic_candidate_clearance: 0.43        # 0.3 m 方形 footprint 的保守外接圆半径
       visualize: true
 
 pb2025_sentry_behavior_client:

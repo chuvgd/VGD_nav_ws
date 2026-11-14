@@ -14,7 +14,7 @@
 
 #include "pb2025_sentry_behavior/plugins/action/send_nav2_goal.hpp"
 
-#include "pb2025_sentry_behavior/custom_types.hpp"
+#include "pb2025_sentry_behavior/tools/custom_types.hpp"
 
 namespace pb2025_sentry_behavior
 {
@@ -28,6 +28,11 @@ SendNav2GoalAction::SendNav2GoalAction(
 bool SendNav2GoalAction::setGoal(nav2_msgs::action::NavigateToPose::Goal & goal)
 {
   auto receive_goal = getInput<geometry_msgs::msg::PoseStamped>("goal");
+
+  if (!receive_goal) {
+    RCLCPP_ERROR(logger(), "Missing or invalid navigation goal");
+    return false;
+  }
 
   goal.pose.header.frame_id = "map";
   goal.pose.header.stamp = now();

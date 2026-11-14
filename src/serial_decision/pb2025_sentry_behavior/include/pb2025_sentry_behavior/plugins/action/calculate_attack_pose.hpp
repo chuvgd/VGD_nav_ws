@@ -21,6 +21,7 @@
 
 #include "behaviortree_cpp/action_node.h"
 #include "behaviortree_ros2/bt_topic_pub_node.hpp"
+#include "pb2025_sentry_behavior/tools/semantic_regions.hpp"
 #include "geometry_msgs/msg/point.hpp"
 #include "geometry_msgs/msg/point_stamped.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
@@ -59,6 +60,7 @@ private:
     double transform_tolerance;
     double max_visualization_distance;
     double marker_scale_base;
+    double semantic_candidate_clearance;
     bool visualize;
   };//参数结构体
 
@@ -84,6 +86,9 @@ private:
 
   std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
   std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+  SemanticRegions semantic_regions_;
+  bool semantic_filter_enabled_ = false;
+  bool semantic_regions_valid_ = true;
   Parameters params_;
 
   PointStamped enemy_on_costmap_;

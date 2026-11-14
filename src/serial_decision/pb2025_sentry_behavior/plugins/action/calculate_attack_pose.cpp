@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "pb2025_sentry_behavior/tools/custom_types.hpp"
 #include "pb2025_sentry_behavior/plugins/action/calculate_attack_pose.hpp"
 
 #include <sstream>
-
 #include "std_msgs/msg/string.hpp"
 #include "nav2_util/node_utils.hpp"
 #include "nav2_util/robot_utils.hpp"
@@ -41,7 +41,7 @@ bool CalculateAttackPoseAction::parseVisionString(const std::string & data, doub
   try {
     x = std::stod(parts[0]);
     y = std::stod(parts[1]);
-    detected = std::stod(parts[2]) != 0.0;
+    detected = std::stod(parts[2]) == 1.0;
   } catch (const std::exception &) {
     return false;
   }
@@ -68,6 +68,8 @@ CalculateAttackPoseAction::CalculateAttackPoseAction(
     node_, name + ".max_visualization_distance", rclcpp::ParameterValue(6.0));
   declare_parameter_if_not_declared(
     node_, name + ".marker_scale_base", rclcpp::ParameterValue(0.2));
+  declare_parameter_if_not_declared(
+    node_, name + ".semantic_candidate_clearance", rclcpp::ParameterValue(0.43));
   declare_parameter_if_not_declared(node_, name + ".visualize", rclcpp::ParameterValue(false));
 
   node_->get_parameter(name + ".attack_radius", params_.attack_radius);
@@ -78,7 +80,30 @@ CalculateAttackPoseAction::CalculateAttackPoseAction(
   node_->get_parameter(name + ".transform_tolerance", params_.transform_tolerance);
   node_->get_parameter(name + ".max_visualization_distance", params_.max_visualization_distance);
   node_->get_parameter(name + ".marker_scale_base", params_.marker_scale_base);
+  node_->get_parameter(name + ".semantic_candidate_clearance", params_.semantic_candidate_clearance);
   node_->get_parameter(name + ".visualize", params_.visualize);
+
+  if (!node_->has_parameter("semantic_enabled")) {
+    node_->declare_parameter<bool>("semantic_enabled", false);
+  }
+  if (!node_->has_parameter("semantic_map_file")) {
+    node_->declare_parameter<std::string>("semantic_map_file", "");
+  }
+  if (!node_->has_parameter("allowed_regions")) {
+    node_->declare_parameter<std::vector<std::string>>(
+      "allowed_regions", std::vector<std::string>{});
+  }
+
+  semantic_filter_enabled_ = node_->get_parameter("semantic_enabled").as_bool();
+  if (semantic_filter_enabled_) {
+    std::string error;
+    semantic_regions_valid_ = semantic_regions_.load(
+      node_->get_parameter("semantic_map_file").as_string(),
+      node_->get_parameter("allowed_regions").as_string_array(), error);
+    if (!semantic_regions_valid_) {
+      RCLCPP_ERROR(node_->get_logger(), "Attack point filtering failed to load map: %s", error.c_str());
+    }
+  }
 }
 
 BT::PortsList CalculateAttackPoseAction::providedPorts()
@@ -88,6 +113,8 @@ BT::PortsList CalculateAttackPoseAction::providedPorts()
       "costmap_port", "{@nav_globalCostmap}", "GlobalCostmap port on blackboard"),
     BT::InputPort<std_msgs::msg::String>(
       "tracker_port", "{@vision_string_data}", "Vision target port on blackboard"),
+    BT::InputPort<std::chrono::steady_clock::time_point>(
+      "vision_received_at", "{@vision_received_at}", "Vision receive time"),
     BT::OutputPort<PoseStamped>(
       "goal", "{attack_pose}", "Expected goal pose that send to nav2. Fill with format `x;y;yaw`"),
   });
@@ -97,9 +124,22 @@ bool CalculateAttackPoseAction::setMessage(visualization_msgs::msg::MarkerArray 
 {
   auto global_costmap = getInput<nav_msgs::msg::OccupancyGrid>("costmap_port");
   auto tracker_target = getInput<std_msgs::msg::String>("tracker_port");
+  auto received = getInput<std::chrono::steady_clock::time_point>("vision_received_at");
 
-  if (!global_costmap) {
+  if (!received ||
+      std::chrono::steady_clock::now() - received.value() > std::chrono::milliseconds(500)) {
+    return false;
+  }
+  if (!semantic_regions_valid_) return false;
+
+  if (!global_costmap || global_costmap->header.frame_id != "map") {
     RCLCPP_ERROR(node_->get_logger(), "Missing required input: costmap_port");
+    return false;
+  }
+  const auto & info = global_costmap->info;
+  if (info.resolution <= 0.0 || info.width == 0 || info.height == 0 ||
+      global_costmap->data.size() != static_cast<size_t>(info.width) * info.height) {
+    RCLCPP_WARN(node_->get_logger(), "Invalid global costmap");
     return false;
   }
   if (!tracker_target) {
@@ -115,7 +155,8 @@ bool CalculateAttackPoseAction::setMessage(visualization_msgs::msg::MarkerArray 
   double enemy_x = 0.0;
   double enemy_y = 0.0;
   bool detected = false;
-  if (!parseVisionString(tracker_target->data, enemy_x, enemy_y, detected)) {
+  if (!parseVisionString(tracker_target->data, enemy_x, enemy_y, detected) ||
+      !std::isfinite(enemy_x) || !std::isfinite(enemy_y)) {
     RCLCPP_WARN(node_->get_logger(), "Invalid vision data: '%s'", tracker_target->data.c_str());
     return false;
   }
@@ -237,6 +278,12 @@ std::vector<Point> CalculateAttackPoseAction::filterFeasiblePoints(
   const auto & info = costmap.info;
 
   for (const auto & p : candidates) {
+    if (semantic_filter_enabled_ &&
+      !semantic_regions_.contains(p.x, p.y, params_.semantic_candidate_clearance))
+    {
+      continue;
+    }
+
     const int cell_x = static_cast<int>((p.x - info.origin.position.x) / info.resolution);
     const int cell_y = static_cast<int>((p.y - info.origin.position.y) / info.resolution);
 

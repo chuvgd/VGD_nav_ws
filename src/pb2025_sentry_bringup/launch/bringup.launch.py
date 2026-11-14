@@ -43,9 +43,6 @@ def generate_launch_description():
     # Create the launch configuration variables
     ## Serial
     robot_name = LaunchConfiguration("robot_name")
-    ## Vision
-    # detector = LaunchConfiguration("detector")
-    # use_hik_camera = LaunchConfiguration("use_hik_camera")
     ## Navigation
     slam = LaunchConfiguration("slam")
     world = LaunchConfiguration("world")
@@ -83,18 +80,6 @@ def generate_launch_description():
         default_value="VGD2027_sentry_robot",
         description="Robot profile used for the minimal body static TF",
     )
-
-    # declare_detector_cmd = DeclareLaunchArgument(
-    #     "detector",
-    #     default_value="opencv",
-    #     description="Type of detector to use (option: 'opencv', 'openvino')",
-    # )
-
-    # declare_use_hik_camera_cmd = DeclareLaunchArgument(
-    #     "use_hik_camera",
-    #     default_value="True",
-    #     description="Whether to bringup hik camera node",
-    # )
 
     declare_slam_cmd = DeclareLaunchArgument(
         "slam",
@@ -207,23 +192,6 @@ def generate_launch_description():
         }.items(),
     )
 
-    # start_vision_launch_cmd = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource(
-    #         os.path.join(vision_bringup_dir, "launch", "rm_vision_reality_launch.py")
-    #     ),
-    #     launch_arguments={
-    #         "detector": detector,
-    #         "use_hik_camera": use_hik_camera,
-    #         "namespace": namespace,
-    #         "use_sim_time": use_sim_time,
-    #         "params_file": params_file,
-    #         "use_robot_state_pub": use_robot_state_pub,
-    #         "use_composition": use_composition,
-    #         "use_rviz": "False",
-    #         "use_respawn": use_respawn,
-    #         "log_level": log_level,
-    #     }.items(),
-    # )
 
     start_navigation_launch_cmd = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -269,16 +237,6 @@ def generate_launch_description():
         }.items(),
     )
 
-    # record_rosbag_cmd = Node(
-    #     package="rosbag2_composable_recorder",
-    #     executable="composable_recorder_node",
-    #     name="rosbag_recorder",
-    #     output="screen",
-    #     respawn=use_respawn,
-    #     respawn_delay=2.0,
-    #     parameters=[configured_params],
-    #     arguments=["--ros-args", "--log-level", log_level],
-    # )
 
     # Create the launch description and populate
     ld = LaunchDescription()
@@ -289,8 +247,6 @@ def generate_launch_description():
 
     # Declare the launch options
     ld.add_action(declare_robot_name_cmd)
-    # ld.add_action(declare_detector_cmd)
-    # ld.add_action(declare_use_hik_camera_cmd)
     ld.add_action(declare_slam_cmd)
     ld.add_action(declare_world_cmd)
     ld.add_action(declare_map_yaml_cmd)
@@ -310,9 +266,7 @@ def generate_launch_description():
     ld.add_action(GroupAction([start_body_tf_cmd]))
     ld.add_action(GroupAction([start_rviz_cmd]))
     ld.add_action(GroupAction([start_serial_driver_cmd]))
-    # ld.add_action(start_vision_launch_cmd)
     ld.add_action(GroupAction([start_navigation_launch_cmd]))
     ld.add_action(GroupAction([start_behavior_launch_cmd]))
-    # ld.add_action(record_rosbag_cmd)
 
     return ld

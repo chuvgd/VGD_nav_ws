@@ -5,6 +5,7 @@
 #include <string>
 
 #include "behaviortree_cpp/action_node.h"
+#include "behaviortree_ros2/ros_node_params.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "rclcpp/rclcpp.hpp"
 #include "tf2_ros/buffer.h"
@@ -30,8 +31,10 @@ public:
    * @brief 构造函数
    * @param name XML 标签中的节点名称
    * @param config BT 节点配置
+   * @param params ROS 节点参数
    */
-  WaitUntilReached(const std::string & name, const BT::NodeConfig & config);
+  WaitUntilReached(
+    const std::string & name, const BT::NodeConfig & config, const BT::RosNodeParams & params);
 
   /**
    * @brief 析构函数

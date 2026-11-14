@@ -1,3 +1,4 @@
+#include "pb2025_sentry_behavior/tools/custom_types.hpp"
 #include "pb2025_sentry_behavior/plugins/action/get_current_waypoint.hpp"
 
 #include "rclcpp/rclcpp.hpp"

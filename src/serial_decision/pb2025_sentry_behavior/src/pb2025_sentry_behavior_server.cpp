@@ -1,33 +1,15 @@
-// Copyright 2025 Lihan Chen
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 #include "pb2025_sentry_behavior/pb2025_sentry_behavior_server.hpp"
 
 #include <filesystem>
 #include <fstream>
 
 #include "std_msgs/msg/string.hpp"
-#include "auto_aim_interfaces/msg/armors.hpp"
-#include "auto_aim_interfaces/msg/target.hpp"
 #include "behaviortree_cpp/xml_parsing.h"
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/occupancy_grid.hpp"
-#include "pb_rm_interfaces/msg/buff.hpp"
 #include "pb_rm_interfaces/msg/event_data.hpp"
 #include "pb_rm_interfaces/msg/game_robot_hp.hpp"
 #include "pb_rm_interfaces/msg/game_status.hpp"
-#include "pb_rm_interfaces/msg/ground_robot_position.hpp"
 #include "pb_rm_interfaces/msg/rfid_status.hpp"
 #include "pb_rm_interfaces/msg/robot_status.hpp"//引入这些自定义消息类型的接口
 namespace pb2025_sentry_behavior
@@ -48,30 +30,36 @@ SentryBehaviorServer::SentryBehaviorServer(const rclcpp::NodeOptions & options)
 {
   node()->declare_parameter("use_cout_logger", false);//声明参数
   node()->get_parameter("use_cout_logger", use_cout_logger_);//从use_cout_logger_获取参数
+  node()->declare_parameter<std::string>("entry_goal", "");
+  node()->declare_parameter<std::string>("patrol_waypoint_file", "");
+  node()->declare_parameter<std::string>("home_goal", "");
+  std::string entry_goal;
+  std::string patrol_waypoint_file;
+  std::string home_goal;
+  node()->get_parameter("entry_goal", entry_goal);
+  node()->get_parameter("patrol_waypoint_file", patrol_waypoint_file);
+  node()->get_parameter("home_goal", home_goal);
+  globalBlackboard()->set("entry_goal", entry_goal);
+  globalBlackboard()->set("patrol_waypoint_file", patrol_waypoint_file);
+  globalBlackboard()->set("home_goal", home_goal);
 
   subscribe<pb_rm_interfaces::msg::EventData>("referee/event_data", "referee_eventData");
   subscribe<pb_rm_interfaces::msg::GameRobotHP>("referee/all_robot_hp", "referee_allRobotHP");
   subscribe<pb_rm_interfaces::msg::GameStatus>("referee/game_status", "referee_gameStatus");
-  subscribe<pb_rm_interfaces::msg::GroundRobotPosition>(
-    "referee/ground_robot_position", "referee_groundRobotPosition");
   subscribe<pb_rm_interfaces::msg::RfidStatus>("referee/rfid_status", "referee_rfidStatus");
   subscribe<pb_rm_interfaces::msg::RobotStatus>("referee/robot_status", "referee_robotStatus");
-  subscribe<pb_rm_interfaces::msg::Buff>("referee/buff", "referee_buff");//在构造函数中引入模板函数subscribe，传入参数topic和bb_key
-  subscribe<std_msgs::msg::String>("auto_aim_target_pos","vision_string_data");
+  auto vision_sub = node()->create_subscription<std_msgs::msg::String>(
+    "auto_aim_target_pos", 10, [this](const std_msgs::msg::String::SharedPtr msg) {
+      globalBlackboard()->set("vision_string_data", *msg);
+      globalBlackboard()->set("vision_received_at", std::chrono::steady_clock::now());
+    });
+  subscriptions_.push_back(vision_sub);
   // 订阅 cmd_vel 用于检查速度是否为零
   subscribe<geometry_msgs::msg::Twist>("cmd_vel", "cmd_vel");
-
-  // auto detector_qos = rclcpp::SensorDataQoS();
-  // subscribe<auto_aim_interfaces::msg::Armors>("detector/armors", "detector_armors", detector_qos);
-  // auto tracker_qos = rclcpp::SensorDataQoS();
-  // subscribe<auto_aim_interfaces::msg::Target>("tracker/target", "tracker_target", tracker_qos);//视觉和自瞄数据（高频传感器）--qos策略（留坑）--这里rclcpp::SensorDataQoS()是保持最新消息
 
   auto costmap_qos = rclcpp::QoS(rclcpp::KeepLast(1)).transient_local().reliable();//rclcpp::KeepLast(1)：队列深度为1；transient_local()：暂时保留/本地持久化；reliable()：可靠传递--必须把消息传到
   subscribe<nav_msgs::msg::OccupancyGrid>(
     "global_costmap/costmap", "nav_globalCostmap", costmap_qos);//订阅话题，把收到的话题的数据传入全局的黑板的键中--字典键值对模式
-  //globalBlackboard()->set("wp_idx",0);
-  //globalBlackboard()->set("home_wp_idx",0);
-  //globalBlackboard()->set("patrol_wp_idx",0);
 }//构造函数
 
 bool SentryBehaviorServer::onGoalReceived(

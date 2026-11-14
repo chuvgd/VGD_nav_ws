@@ -1,6 +1,7 @@
 #include "pb2025_sentry_behavior/plugins/condition/is_enemy_in_range.hpp"
 
 #include <cmath>
+#include <limits>
 
 namespace pb2025_sentry_behavior
 {
@@ -48,9 +49,15 @@ BT::NodeStatus IsEnemyInRangeCondition::checkEnemyInRange()
     return BT::NodeStatus::FAILURE;
   }
 
-  double x = std::stod(parts[0]);
-  double y = std::stod(parts[1]);
-  double distance = std::sqrt(x * x + y * y);
+  double x;
+  double y;
+  try {
+    x = std::stod(parts[0]);
+    y = std::stod(parts[1]);
+  } catch (const std::exception &) {
+    return BT::NodeStatus::FAILURE;
+  }
+  const double distance = std::hypot(x, y);
 
   if (distance <= max_distance) {
     RCLCPP_INFO(logger_, "Enemy in range: dist=%.2f <= max=%.2f (x=%.2f, y=%.2f)",

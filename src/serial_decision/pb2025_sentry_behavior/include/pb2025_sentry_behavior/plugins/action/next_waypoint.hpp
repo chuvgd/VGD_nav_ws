@@ -34,12 +34,13 @@ public:
    */
   static BT::PortsList providedPorts();
 
+  BT::NodeStatus tick() override;
+
 private:
   /**
    * @brief tick 函数：递增 wp_idx（循环）
    * @return BT::NodeStatus 切换结果
    */
-  BT::NodeStatus tick() override;
 };
 
 }  // namespace pb2025_sentry_behavior

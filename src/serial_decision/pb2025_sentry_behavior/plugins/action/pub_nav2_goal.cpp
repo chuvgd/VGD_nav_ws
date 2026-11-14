@@ -14,7 +14,9 @@
 
 #include "pb2025_sentry_behavior/plugins/action/pub_nav2_goal.hpp"
 
-#include "pb2025_sentry_behavior/custom_types.hpp"
+#include "pb2025_sentry_behavior/tools/custom_types.hpp"
+
+#include "pb2025_sentry_behavior/tools/navigation_goal_state.hpp"
 
 namespace pb2025_sentry_behavior
 {
@@ -34,11 +36,22 @@ bool PubNav2GoalAction::setMessage(geometry_msgs::msg::PoseStamped & msg)
                                                                 //能够自动识别并解析 XML 中的字符串（getInput 是节点与外部（XML 或 黑板）进行交互的核心方式--拿外部数据）
                                                                 //setOutput 就是节点“把处理结果递出去”（节点->黑板）
 
+  if (!goal) {
+    RCLCPP_ERROR(logger(), "Missing or invalid goal");
+    return false;
+  }
   msg.header.stamp = now();
-  msg.header.frame_id = "map";
+  msg.header.frame_id = goal->header.frame_id.empty() ? "map" : goal->header.frame_id;
   msg.pose = goal->pose;//修改msg--就是相当于引用传递把goal写入msg
   setOutput("goal_out", msg);//把传入的msg写入黑板，端口名为"goal_out"，实际上是把msg写入{goal_out}，如果xml中没有写明黑板键名，默认黑板键名为{goal_out}
+  getInput("publish_if_changed", publish_if_changed_);
   return true;//消息填充成功返回true，父类RosTopicPubNode拿着msg去执行发布操作
+}
+
+bool PubNav2GoalAction::shouldPublish(const geometry_msgs::msg::PoseStamped & goal)
+{
+  return pb2025_sentry_behavior::shouldPublishNavigationGoal(
+    *config().blackboard, goal, publish_if_changed_);
 }
 
 BT::PortsList PubNav2GoalAction::providedPorts()
@@ -47,6 +60,7 @@ BT::PortsList PubNav2GoalAction::providedPorts()
     BT::InputPort<geometry_msgs::msg::PoseStamped>(
       "goal", "0;0;0", "Expected goal pose that send to nav2. Fill with format `x;y;yaw`"),
     BT::OutputPort<geometry_msgs::msg::PoseStamped>("goal_out", "{goal_out}","Published goal pose"),//提供输出端口，定义输出端口名为"goal_out"，默认键名为{goal_out}，描述为"Published goal pose"（输出端口是将节点处理的结果写入黑板）
+    BT::InputPort<bool>("publish_if_changed", false, "Only publish when goal pose changes"),
   };//定义端口列表
     // 声明了一个名为 "goal" 的输入端口，类型是 PoseStamped
     // 默认值 "0;0;0"：这里利用了字符串转换机制，如果 XML 没传值，就默认去原点
